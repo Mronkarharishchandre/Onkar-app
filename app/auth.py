@@ -3,6 +3,11 @@ StorageOS Authentication Layer
 User registration, credential verification, session handling, and access decorators.
 """
 
+import os
+import json
+import secrets
+import urllib.parse
+import urllib.request
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from app.database import (
@@ -10,6 +15,7 @@ from app.database import (
     get_user_by_username,
     get_user_by_id,
     log_activity,
+    create_or_link_google_user,
 )
 from app.security import (
     validate_username,
@@ -158,3 +164,127 @@ def logout():
     session.clear()
     flash("You have been securely signed out.", "info")
     return redirect(url_for("auth.login"))
+
+
+@auth_bp.route("/google")
+def google_login():
+    """Initiate Google OAuth 2.0 / OIDC login flow."""
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    if not client_id:
+        flash(
+            "Google Login is currently not configured on this instance. To enable it, specify GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the environment.",
+            "warning",
+        )
+        return redirect(url_for("auth.login"))
+
+    # Generate state token for CSRF protection
+    state = secrets.token_urlsafe(32)
+    session["google_oauth_state"] = state
+
+    redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI")
+    if not redirect_uri:
+        redirect_uri = url_for("auth.google_callback", _external=True)
+
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    return redirect(auth_url)
+
+
+@auth_bp.route("/google/callback")
+def google_callback():
+    """Handle the OAuth 2.0 callback from Google."""
+    error = request.args.get("error")
+    if error:
+        flash(f"Google authorization was denied or failed: {error}", "danger")
+        return redirect(url_for("auth.login"))
+
+    code = request.args.get("code")
+    state = request.args.get("state")
+
+    expected_state = session.pop("google_oauth_state", None)
+    if not state or not expected_state or state != expected_state:
+        flash("Google login failed: Invalid or expired OAuth state token.", "danger")
+        return redirect(url_for("auth.login"))
+
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+    redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI")
+    if not redirect_uri:
+        redirect_uri = url_for("auth.google_callback", _external=True)
+
+    if not client_id or not client_secret or not code:
+        flash("Google OAuth credentials or authorization code missing.", "danger")
+        return redirect(url_for("auth.login"))
+
+    # Exchange authorization code for tokens
+    try:
+        token_data = urllib.parse.urlencode({
+            "code": code,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            "https://oauth2.googleapis.com/token",
+            data=token_data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            token_res = json.loads(resp.read().decode("utf-8"))
+
+        access_token = token_res.get("access_token")
+        if not access_token:
+            flash("Failed to retrieve access token from Google.", "danger")
+            return redirect(url_for("auth.login"))
+
+        # Fetch user info
+        userinfo_req = urllib.request.Request(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        with urllib.request.urlopen(userinfo_req, timeout=10) as resp:
+            userinfo = json.loads(resp.read().decode("utf-8"))
+
+        email = userinfo.get("email")
+        google_id = userinfo.get("sub")
+        display_name = userinfo.get("name")
+        avatar_url = userinfo.get("picture")
+
+        if not email or not google_id:
+            flash("Google account did not provide a verified email address.", "danger")
+            return redirect(url_for("auth.login"))
+
+        user = create_or_link_google_user(email, google_id, display_name, avatar_url)
+
+        # Initialize storage
+        get_user_storage_path(user["username"])
+
+        # Authenticate session
+        session.clear()
+        session["user_id"] = user["id"]
+        session["username"] = user["username"]
+        session["display_name"] = user.get("display_name") or user["username"]
+        session["avatar_url"] = user.get("avatar_url")
+        session["lang"] = user.get("language") or "en"
+        session["theme"] = user.get("theme") or "system"
+        session["_csrf_token"] = generate_csrf_token()
+
+        log_activity(user["id"], "LOGIN", None, f"Google OAuth login for {user['username']} ({email})")
+        flash(f"Signed in successfully with Google. Welcome, {user.get('display_name') or user['username']}!", "success")
+        return redirect(url_for("main.dashboard"))
+
+    except Exception as e:
+        flash(f"Google login failed: {str(e)}", "danger")
+        return redirect(url_for("auth.login"))
+

@@ -1,168 +1,263 @@
 {% extends "base.html" %}
 
-{% block title %}Shared With Me - StorageOS{% endblock %}
+{% block title %}{{ t('shared') }} - StorageOS{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <div>
-    <h1 class="page-title">Shared With Me</h1>
-    <p class="page-subtitle">Files shared with your account by other StorageOS members</p>
-  </div>
-</div>
-
-<div class="card" style="margin-bottom: 32px;">
-  <div class="card-header">
-    <h2 class="card-title">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Incoming Shares
-    </h2>
+<div class="content-wrapper">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{{ t('shared') }}</h1>
+      <p class="page-subtitle">{{ t('incoming_shares') }} &bull; Outgoing Access &bull; Secure Links</p>
+    </div>
   </div>
 
-  {% if shared_with_me %}
-  <div class="table-container">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Filename</th>
-          <th>Owner</th>
-          <th>Permission</th>
-          <th>Size</th>
-          <th>Shared Date</th>
-          <th style="text-align: right;">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in shared_with_me %}
-        <tr>
-          <td>
-            <div class="file-name-cell">
-              <span class="file-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              </span>
-              <span title="{{ item.filename }}">{{ item.filename }}</span>
-            </div>
-          </td>
-          <td>
-            <span style="display: inline-flex; align-items: center; gap: 6px;">
-              <span class="brand-badge">{{ item.owner_username }}</span>
-            </span>
-          </td>
-          <td>
-            {% if item.permission == 'editor' %}
-              <span class="brand-badge" style="background-color: rgba(16, 185, 129, 0.2); color: #34d399;">EDITOR</span>
-            {% else %}
-              <span class="brand-badge" style="background-color: rgba(59, 130, 246, 0.2); color: #60a5fa;">VIEWER</span>
-            {% endif %}
-          </td>
-          <td>{{ item.size_formatted }}</td>
-          <td>{{ item.created_at }}</td>
-          <td style="text-align: right;">
-            <div class="action-buttons" style="justify-content: flex-end;">
-              <!-- Download (Allowed for both Viewer and Editor) -->
-              {% if item.available %}
-              <a href="{{ url_for('main.download_shared_file', share_id=item.id) }}" class="btn-icon" title="Download Shared File">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-              </a>
-              {% endif %}
+  <!-- Section 1: Incoming Shares -->
+  <div class="card" style="margin-bottom: 24px;">
+    <div class="card-header">
+      <div class="card-header-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="card-title">{{ t('incoming_shares') }}</h2>
+        <div class="card-subtitle">Files shared directly with your account by peers</div>
+      </div>
+    </div>
+    <div class="card-body">
+      {% if shared_with_me %}
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>{{ t('filename') }}</th>
+              <th>Owner</th>
+              <th>Permission</th>
+              <th>{{ t('size') }}</th>
+              <th>Shared On</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in shared_with_me %}
+            <tr>
+              <td>
+                <div class="file-name-cell">
+                  <span class="file-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                  </span>
+                  <span class="truncate-text" title="{{ item.filename }}">{{ item.filename }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-neutral">@{{ item.owner_username }}</span>
+              </td>
+              <td>
+                {% if item.permission == 'editor' %}
+                  <span class="badge badge-success">EDITOR</span>
+                {% else %}
+                  <span class="badge badge-primary">VIEWER</span>
+                {% endif %}
+              </td>
+              <td style="color: var(--text-secondary); font-size: 13px;">{{ item.size_formatted }}</td>
+              <td style="color: var(--text-secondary); font-size: 13px;">{{ item.created_at }}</td>
+              <td style="text-align: right;">
+                <div class="action-buttons" style="justify-content: flex-end;">
+                  {% if item.available %}
+                  <a href="{{ url_for('main.download_shared_file', share_id=item.id) }}" class="btn-icon btn-sm" title="{{ t('download') }}">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>
+                    </svg>
+                  </a>
+                  {% endif %}
 
-              <!-- Editor Actions: Rename & Delete -->
-              {% if item.permission == 'editor' and item.available %}
-              <button type="button" class="btn-icon" title="Editor: Rename" onclick="openSharedRenameModal('{{ item.id }}', '{{ item.filename }}')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-              </button>
-
-              <form action="{{ url_for('main.delete_shared_file', share_id=item.id) }}" method="POST" onsubmit="return confirm('As Editor, move this shared file to owner trash?');" style="display: inline;">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <button type="submit" class="btn-icon" title="Editor: Move to Trash" style="color: #fb7185;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
-                </button>
-              </form>
-              {% elif item.permission == 'viewer' %}
-              <span style="font-size: 11px; color: var(--text-muted); padding: 4px 8px;" title="Viewer permissions: read-only access">Read-Only</span>
-              {% endif %}
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+                  {% if item.permission == 'editor' and item.available %}
+                  <button type="button" class="btn-icon btn-sm" title="Editor: Rename" onclick="openSharedRenameModal('{{ item.id }}', '{{ item.filename }}')">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
+                    </svg>
+                  </button>
+                  <form action="{{ url_for('main.delete_shared_file', share_id=item.id) }}" method="POST" onsubmit="return confirm('As Editor, move this shared file to owner trash?');" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn-icon btn-sm danger" title="Editor: Move to Trash">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                      </svg>
+                    </button>
+                  </form>
+                  {% elif item.permission == 'viewer' %}
+                  <span style="font-size: 11px; color: var(--text-muted); padding: 4px 6px;">Read-Only</span>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state mini">
+        <p>No incoming files shared with you yet. When peers share documents, they appear here.</p>
+      </div>
+      {% endif %}
+    </div>
   </div>
-  {% else %}
-  <div class="empty-state">
-    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-    <div class="empty-title">No files shared with you</div>
-    <p style="font-size: 13px;">When other users share documents with your username, they appear here.</p>
+
+  <!-- Section 2: Active Public Share Links -->
+  {% if public_links %}
+  <div class="card" style="margin-bottom: 24px;">
+    <div class="card-header">
+      <div class="card-header-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="card-title">{{ t('share_links') }}</h2>
+        <div class="card-subtitle">Public tokenized access links generated for external access</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>{{ t('filename') }}</th>
+              <th>Expires</th>
+              <th>Views</th>
+              <th>Created</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for link in public_links %}
+            <tr>
+              <td>
+                <div class="file-name-cell">
+                  <span class="file-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                  </span>
+                  <span class="truncate-text" title="{{ link.filename }}">{{ link.filename }}</span>
+                  {% if link.has_password %}
+                    <span title="Password Protected" style="color: var(--accent-blue);">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </span>
+                  {% endif %}
+                </div>
+              </td>
+              <td style="font-size: 12px; color: var(--text-secondary);">{{ link.expires_at or 'Never' }}</td>
+              <td><span class="badge badge-neutral">{{ link.views }}</span></td>
+              <td style="font-size: 12px; color: var(--text-secondary);">{{ link.created_at }}</td>
+              <td style="text-align: right;">
+                <div class="action-buttons" style="justify-content: flex-end;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="copyShareLinkText('{{ url_for('main.view_shared_link', token=link.token, _external=True) }}')">
+                    Copy Link
+                  </button>
+                  <form action="{{ url_for('main.revoke_public_share_link', link_id=link.id) }}" method="POST" onsubmit="return confirm('Revoke this public link?');" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="btn btn-danger btn-sm">
+                      Revoke
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
   {% endif %}
-</div>
 
-<!-- Files I Shared Section -->
-<div class="card">
-  <div class="card-header">
-    <h2 class="card-title">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
-      Shares Created by You
-    </h2>
+  <!-- Section 3: Shares Created by You (to peers) -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-header-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+          <line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="card-title">{{ t('shared_by_me') }}</h2>
+        <div class="card-subtitle">Active access delegations given to other users</div>
+      </div>
+    </div>
+    <div class="card-body">
+      {% if shared_by_me %}
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>{{ t('filename') }}</th>
+              <th>Recipient</th>
+              <th>Permission</th>
+              <th>Shared On</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in shared_by_me %}
+            <tr>
+              <td style="font-weight: 500;">{{ s.filename }}</td>
+              <td><span class="badge badge-neutral">@{{ s.shared_with_username }}</span></td>
+              <td>
+                {% if s.permission == 'editor' %}
+                  <span class="badge badge-success">EDITOR</span>
+                {% else %}
+                  <span class="badge badge-primary">VIEWER</span>
+                {% endif %}
+              </td>
+              <td style="color: var(--text-secondary); font-size: 13px;">{{ s.created_at }}</td>
+              <td style="text-align: right;">
+                <form action="{{ url_for('main.revoke_user_share', share_id=s.id) }}" method="POST" style="display: inline;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Revoke this share? Recipient will lose access.');">
+                    Revoke
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state mini">
+        <p>You have not shared files directly with peers yet. Open "My Files" and click "Share" on any file.</p>
+      </div>
+      {% endif %}
+    </div>
   </div>
-
-  {% if shared_by_me %}
-  <div class="table-container">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Filename</th>
-          <th>Shared With</th>
-          <th>Permission</th>
-          <th>Shared On</th>
-          <th style="text-align: right;">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in shared_by_me %}
-        <tr>
-          <td>{{ s.filename }}</td>
-          <td><span class="brand-badge">{{ s.shared_with_username }}</span></td>
-          <td><span class="brand-badge" style="text-transform: uppercase;">{{ s.permission }}</span></td>
-          <td>{{ s.created_at }}</td>
-          <td style="text-align: right;">
-            <form action="{{ url_for('main.revoke_user_share', share_id=s.id) }}" method="POST" style="display: inline;">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Revoke this share? Recipient will lose access.');">
-                Revoke
-              </button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty-state">
-    <div class="empty-title">You haven't shared any files yet</div>
-    <p style="font-size: 13px;">Go to My Files and click the Share icon on any file.</p>
-  </div>
-  {% endif %}
 </div>
 
 <!-- Modal: Editor Rename -->
-<div class="modal-backdrop" id="sharedRenameModal">
-  <div class="modal-card">
+<div class="modal-overlay" id="sharedRenameModal" style="display: none;" onclick="handleModalBackdropClick(event, 'sharedRenameModal')">
+  <div class="modal-card" role="dialog" aria-modal="true">
     <form id="sharedRenameForm" method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="modal-header">
-        <h3 class="modal-title">Editor Rename</h3>
+        <div>
+          <h3 class="modal-title">Editor Rename</h3>
+          <div class="modal-subtitle">Rename shared file with editor privileges</div>
+        </div>
         <button type="button" class="modal-close" onclick="closeModal('sharedRenameModal')">&times;</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label" for="shared_new_name">New Filename</label>
-          <input type="text" id="shared_new_name" name="new_name" class="form-control" required>
+          <input type="text" id="shared_new_name" name="new_name" class="form-control" required autofocus>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('sharedRenameModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Rename Shared File</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('sharedRenameModal')">{{ t('cancel') }}</button>
+        <button type="submit" class="btn btn-primary btn-sm">Rename Shared File</button>
       </div>
     </form>
   </div>
@@ -174,6 +269,14 @@
     form.action = '/shared/rename/' + shareId;
     document.getElementById('shared_new_name').value = filename;
     openModal('sharedRenameModal');
+  }
+
+  function copyShareLinkText(url) {
+    navigator.clipboard.writeText(url).then(function() {
+      alert("Public share link copied to clipboard!");
+    }).catch(function() {
+      prompt("Share URL:", url);
+    });
   }
 </script>
 {% endblock %}

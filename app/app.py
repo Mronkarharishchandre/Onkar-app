@@ -27,6 +27,13 @@ from app.database import (
     log_activity,
     list_all_other_usernames,
     get_db_connection,
+    create_share_link,
+    get_share_link_by_token,
+    increment_share_link_views,
+    revoke_share_link,
+    list_user_share_links,
+    update_user_preferences,
+    update_user_password,
 )
 from app.auth import auth_bp, login_required
 from app.security import (
@@ -34,6 +41,9 @@ from app.security import (
     sanitize_filename,
     generate_csrf_token,
     csrf_protect,
+    hash_password,
+    verify_password,
+    validate_password,
 )
 from app.storage import (
     get_user_storage_path,
@@ -57,6 +67,7 @@ from app.sharing import (
     get_share_record_for_user,
     revoke_share,
 )
+from app.i18n import get_translation, SUPPORTED_LANGUAGES, TRANSLATIONS
 
 main_bp = Blueprint("main", __name__)
 
@@ -90,16 +101,52 @@ def create_app(test_config=None):
     def inject_globals():
         user = None
         quota_info = None
+        current_lang = session.get("lang", "en")
+        current_theme = session.get("theme", "system")
+
         if "user_id" in session and "username" in session:
-            user = {"id": session["user_id"], "username": session["username"]}
+            try:
+                db_user = get_user_by_id(session["user_id"])
+                if db_user:
+                    user = {
+                        "id": db_user["id"],
+                        "username": db_user["username"],
+                        "display_name": db_user.get("display_name") or db_user["username"],
+                        "email": db_user.get("email"),
+                        "avatar_url": db_user.get("avatar_url"),
+                        "theme": db_user.get("theme") or current_theme,
+                        "language": db_user.get("language") or current_lang,
+                        "created_at": db_user.get("created_at"),
+                    }
+                    if "lang" not in session and db_user.get("language"):
+                        session["lang"] = db_user["language"]
+                        current_lang = db_user["language"]
+                    if "theme" not in session and db_user.get("theme"):
+                        session["theme"] = db_user["theme"]
+                        current_theme = db_user["theme"]
+                else:
+                    user = {"id": session["user_id"], "username": session["username"]}
+            except Exception:
+                user = {"id": session["user_id"], "username": session["username"]}
+
             try:
                 quota_info = get_user_quota_info(session["username"])
             except Exception:
                 pass
+
+        def translate(key, default=None):
+            return get_translation(key, lang=session.get("lang", "en"), default=default)
+
         return {
             "current_user": user,
             "csrf_token": generate_csrf_token(),
             "global_quota": quota_info,
+            "current_lang": session.get("lang", "en"),
+            "current_theme": session.get("theme", "system"),
+            "supported_languages": SUPPORTED_LANGUAGES,
+            "translations": TRANSLATIONS,
+            "t": translate,
+            "google_login_enabled": bool(os.environ.get("GOOGLE_CLIENT_ID")),
         }
 
     # Register blueprints
@@ -384,10 +431,12 @@ def shared():
     user_id = session["user_id"]
     shared_with_me = list_files_shared_with_user(user_id)
     shared_by_me = list_files_shared_by_user(user_id)
+    public_links = list_user_share_links(user_id)
     return render_template(
         "shared.html",
         shared_with_me=shared_with_me,
         shared_by_me=shared_by_me,
+        public_links=public_links,
     )
 
 
@@ -409,7 +458,7 @@ def share_file():
 
     try:
         create_share(user_id, owner_username, target_username, relative_path, permission)
-        flash(f"Successfully shared '{os.path.basename(relative_path)}' with {target_username} as {permission.upper()}.", "success")
+        flash(f"Shared '{os.path.basename(relative_path)}' with {target_username} as {permission.upper()} successfully.", "success")
     except ValueError as e:
         flash(str(e), "warning")
     except PermissionError:
@@ -612,6 +661,337 @@ def activity():
     user_id = session["user_id"]
     logs = get_user_activity(user_id, limit=100)
     return render_template("activity.html", logs=logs)
+
+
+# ==========================================
+# Localization & Theme Switcher
+# ==========================================
+
+@main_bp.route("/set-language", methods=["POST"])
+def set_language():
+    """Update active UI language in session and database."""
+    lang = request.form.get("language", "en").strip().lower()
+    if lang in SUPPORTED_LANGUAGES:
+        session["lang"] = lang
+        if "user_id" in session:
+            try:
+                update_user_preferences(session["user_id"], language=lang)
+            except Exception:
+                pass
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.is_json or "application/json" in request.headers.get("Accept", ""):
+        return jsonify({"status": "ok", "lang": lang})
+    next_url = request.form.get("next") or request.referrer or url_for("main.dashboard")
+    return redirect(next_url)
+
+
+@main_bp.route("/set-theme", methods=["POST"])
+def set_theme():
+    """Update active UI theme in session and database."""
+    theme = request.form.get("theme", "system").strip().lower()
+    if theme in ("light", "dark", "system"):
+        session["theme"] = theme
+        if "user_id" in session:
+            try:
+                update_user_preferences(session["user_id"], theme=theme)
+            except Exception:
+                pass
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.is_json or "application/json" in request.headers.get("Accept", ""):
+        return jsonify({"status": "ok", "theme": theme})
+    next_url = request.form.get("next") or request.referrer or url_for("main.dashboard")
+    return redirect(next_url)
+
+
+# ==========================================
+# File Preview & Streaming
+# ==========================================
+
+@main_bp.route("/files/raw/<path:rel_path>")
+@login_required
+def serve_raw_file(rel_path):
+    """Safely stream a file for in-browser preview (images, PDF, audio, video)."""
+    username = session["username"]
+    user_root = get_user_storage_path(username)
+    try:
+        safe_path = get_safe_user_path(user_root, rel_path)
+        if not os.path.exists(safe_path) or not os.path.isfile(safe_path):
+            abort(404, description="File not found")
+        return send_file(safe_path, as_attachment=False)
+    except PermissionError:
+        abort(403, description="Path traversal prevented")
+
+
+@main_bp.route("/api/preview-info")
+@login_required
+def preview_info():
+    """Retrieve file metadata and text preview if applicable for the modal previewer."""
+    username = session["username"]
+    rel_path = request.args.get("rel_path", "").strip()
+    if not rel_path:
+        return jsonify({"error": "No path provided"}), 400
+
+    user_root = get_user_storage_path(username)
+    try:
+        safe_path = get_safe_user_path(user_root, rel_path)
+        if not os.path.exists(safe_path) or not os.path.isfile(safe_path):
+            return jsonify({"error": "File not found"}), 404
+
+        filename = os.path.basename(safe_path)
+        ext = os.path.splitext(filename)[1].lower()
+        size_bytes = os.path.getsize(safe_path)
+        size_str = format_bytes(size_bytes)
+        mod_time = os.path.getmtime(safe_path)
+        from datetime import datetime
+        mod_str = datetime.fromtimestamp(mod_time).strftime("%Y-%m-%d %H:%M")
+
+        img_exts = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico"}
+        pdf_exts = {".pdf"}
+        media_exts = {".mp3", ".wav", ".ogg", ".mp4", ".webm", ".m4a"}
+        text_exts = {
+            ".txt", ".md", ".json", ".csv", ".py", ".js", ".html", ".css", ".sh",
+            ".yml", ".yaml", ".xml", ".sql", ".ts", ".ini", ".conf", ".log",
+            ".dockerfile", ".gitignore", ".env", ".c", ".cpp", ".h", ".rs", ".go"
+        }
+
+        category = "binary"
+        raw_url = url_for("main.serve_raw_file", rel_path=rel_path)
+        download_url = url_for("main.download_file", rel_path=rel_path)
+        text_content = None
+
+        if ext in img_exts:
+            category = "image"
+        elif ext in pdf_exts:
+            category = "pdf"
+        elif ext in media_exts:
+            category = "media"
+        elif ext in text_exts or size_bytes < 512 * 1024:
+            try:
+                with open(safe_path, "r", encoding="utf-8", errors="replace") as f:
+                    text_content = f.read(500000)
+                category = "text"
+            except Exception:
+                category = "binary"
+
+        return jsonify({
+            "filename": filename,
+            "relative_path": rel_path,
+            "size_formatted": size_str,
+            "size_bytes": size_bytes,
+            "modified": mod_str,
+            "category": category,
+            "raw_url": raw_url,
+            "download_url": download_url,
+            "text_content": text_content,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==========================================
+# Secure Public Share Links (/share/<token>)
+# ==========================================
+
+@main_bp.route("/share-link/create", methods=["POST"])
+@login_required
+@csrf_protect
+def create_public_share_link():
+    """Create a tokenized public share link with optional password and expiration."""
+    user_id = session["user_id"]
+    username = session["username"]
+    rel_path = request.form.get("relative_path", "").strip()
+    password = request.form.get("password", "").strip()
+    expires_hours_str = request.form.get("expires_hours", "0").strip()
+
+    if not rel_path:
+        return jsonify({"error": "Path is required"}), 400
+
+    user_root = get_user_storage_path(username)
+    try:
+        safe_path = get_safe_user_path(user_root, rel_path)
+        if not os.path.exists(safe_path) or not os.path.isfile(safe_path):
+            return jsonify({"error": "File does not exist"}), 404
+
+        filename = os.path.basename(safe_path)
+        pwd_hash = hash_password(password) if password else None
+        expires_hours = int(expires_hours_str) if expires_hours_str.isdigit() else 0
+
+        token = create_share_link(user_id, rel_path, filename, pwd_hash, expires_hours)
+        share_url = url_for("main.view_shared_link", token=token, _external=True)
+
+        log_activity(user_id, "SHARE_LINK", filename, f"Created public share link for {filename}")
+
+        wants_json = request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.is_json or "application/json" in request.headers.get("Accept", "")
+        if wants_json:
+            return jsonify({
+                "success": True,
+                "token": token,
+                "share_url": share_url,
+                "filename": filename,
+            })
+
+        flash(f"Public share link generated for '{filename}'.", "success")
+        return redirect(request.referrer or url_for("main.files"))
+
+    except Exception as e:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.is_json:
+            return jsonify({"error": str(e)}), 500
+        flash(f"Failed to create share link: {str(e)}", "danger")
+        return redirect(request.referrer or url_for("main.files"))
+
+
+@main_bp.route("/share/<token>", methods=["GET", "POST"])
+def view_shared_link(token):
+    """Public viewing and download page for tokenized share links."""
+    record = get_share_link_by_token(token)
+    if not record:
+        return render_template("error.html", code=404, title="Share Link Not Found", message="This share link does not exist or has expired."), 404
+
+    owner_username = record["owner_username"]
+    owner_root = get_user_storage_path(owner_username)
+    try:
+        safe_path = get_safe_user_path(owner_root, record["relative_path"])
+        if not os.path.exists(safe_path) or not os.path.isfile(safe_path):
+            return render_template("error.html", code=404, title="File Not Found", message="The shared file is no longer available on this server."), 404
+    except PermissionError:
+        abort(403)
+
+    password_required = bool(record["password_hash"])
+    authenticated = not password_required or session.get(f"share_authed_{token}")
+
+    if request.method == "POST" and password_required and not authenticated:
+        entered_pwd = request.form.get("password", "")
+        if verify_password(record["password_hash"], entered_pwd):
+            session[f"share_authed_{token}"] = True
+            authenticated = True
+        else:
+            flash("Incorrect password for this share link.", "danger")
+
+    file_size = os.path.getsize(safe_path)
+    ext = os.path.splitext(record["filename"])[1].lower()
+
+    return render_template(
+        "share_view.html",
+        record=record,
+        token=token,
+        filename=record["filename"],
+        size_formatted=format_bytes(file_size),
+        password_required=password_required,
+        authenticated=authenticated,
+        ext=ext,
+    )
+
+
+@main_bp.route("/share/<token>/download")
+def download_shared_token_file(token):
+    """Download the file behind a public share link."""
+    record = get_share_link_by_token(token)
+    if not record:
+        abort(404, description="Link invalid or expired.")
+
+    if record["password_hash"] and not session.get(f"share_authed_{token}"):
+        abort(403, description="Password authentication required for this download.")
+
+    owner_username = record["owner_username"]
+    owner_root = get_user_storage_path(owner_username)
+    try:
+        safe_path = get_safe_user_path(owner_root, record["relative_path"])
+        if not os.path.exists(safe_path) or not os.path.isfile(safe_path):
+            abort(404, description="Shared file no longer exists.")
+
+        increment_share_link_views(token)
+        return send_file(safe_path, as_attachment=True, download_name=record["filename"])
+    except PermissionError:
+        abort(403)
+
+
+@main_bp.route("/share-link/revoke/<int:link_id>", methods=["POST"])
+@login_required
+@csrf_protect
+def revoke_public_share_link(link_id):
+    """Revoke a public share link."""
+    user_id = session["user_id"]
+    try:
+        revoke_share_link(link_id, user_id)
+        flash("Public share link revoked.", "info")
+    except Exception as e:
+        flash(f"Failed to revoke share link: {str(e)}", "danger")
+    return redirect(url_for("main.shared"))
+
+
+# ==========================================
+# Settings & Profile Routes
+# ==========================================
+
+@main_bp.route("/settings")
+@main_bp.route("/profile")
+@login_required
+def settings():
+    """Enterprise user profile, appearance, language, security and system settings."""
+    user_id = session["user_id"]
+    username = session["username"]
+    db_user = get_user_by_id(user_id)
+    quota_info = get_user_quota_info(username)
+    recent_logs = get_user_activity(user_id, limit=5)
+    share_links = list_user_share_links(user_id)
+
+    return render_template(
+        "settings.html",
+        user=db_user,
+        quota=quota_info,
+        recent_logs=recent_logs,
+        share_links=share_links,
+    )
+
+
+@main_bp.route("/settings/preferences", methods=["POST"])
+@login_required
+@csrf_protect
+def update_preferences():
+    """Update profile display name, theme, and language."""
+    user_id = session["user_id"]
+    display_name = request.form.get("display_name", "").strip()
+    theme = request.form.get("theme", "system").strip().lower()
+    lang = request.form.get("language", "en").strip().lower()
+
+    if theme not in ("light", "dark", "system"):
+        theme = "system"
+    if lang not in SUPPORTED_LANGUAGES:
+        lang = "en"
+
+    update_user_preferences(user_id, theme=theme, language=lang, display_name=display_name)
+    session["theme"] = theme
+    session["lang"] = lang
+    if display_name:
+        session["display_name"] = display_name
+
+    flash("Profile and preferences saved successfully.", "success")
+    return redirect(url_for("main.settings"))
+
+
+@main_bp.route("/settings/password", methods=["POST"])
+@login_required
+@csrf_protect
+def update_password_route():
+    """Update user password with credential verification."""
+    user_id = session["user_id"]
+    current_password = request.form.get("current_password", "")
+    new_password = request.form.get("new_password", "")
+    confirm_password = request.form.get("confirm_password", "")
+
+    user = get_user_by_id(user_id)
+    if not user or not verify_password(user["password_hash"], current_password):
+        flash("Current password verification failed.", "danger")
+        return redirect(url_for("main.settings"))
+
+    valid, err = validate_password(new_password, confirm_password)
+    if not valid:
+        flash(err, "danger")
+        return redirect(url_for("main.settings"))
+
+    new_hash = hash_password(new_password)
+    update_user_password(user_id, new_hash)
+    log_activity(user_id, "PASSWORD_CHANGE", None, "User changed account password")
+    flash("Password updated successfully.", "success")
+    return redirect(url_for("main.settings"))
 
 
 # ==========================================
