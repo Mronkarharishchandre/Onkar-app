@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In - StorageOS{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card">
+  <div class="auth-header">
+    <div class="auth-logo">
+      <div class="brand-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 8 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+        </svg>
+      </div>
+      <span class="brand-title" style="font-size: 24px;">StorageOS</span>
+    </div>
+    <h1 class="auth-title">Welcome Back</h1>
+    <p class="auth-desc">Sign in to access your personal cloud storage</p>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-container">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">
+            <span>{{ message }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="form-group">
+      <label class="form-label" for="username">Username</label>
+      <input type="text" id="username" name="username" class="form-control" placeholder="Enter your username" value="{{ username or '' }}" required autofocus autocomplete="username">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="password">Password</label>
+      <input type="password" id="password" name="password" class="form-control" placeholder="Enter your password" required autocomplete="current-password">
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 11px;" id="login-submit-btn">
+      Sign In
+    </button>
+  </form>
+
+  <div class="auth-footer">
+    Don't have an account? <a href="{{ url_for('auth.register') }}" id="link-register">Create an account</a>
+  </div>
+</div>
+{% endblock %}

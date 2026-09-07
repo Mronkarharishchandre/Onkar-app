@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Storage Quota - StorageOS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Storage Quota & Volume Usage</h1>
+    <p class="page-subtitle">Detailed disk allocation, usage metrics, and volume limits</p>
+  </div>
+</div>
+
+<div class="card" style="max-width: 720px; margin-bottom: 28px;">
+  <div class="card-header">
+    <h2 class="card-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+      Volume Capacity
+    </h2>
+    <span class="brand-badge" style="font-size: 13px;">{{ quota.percentage }}% Used</span>
+  </div>
+
+  <div style="margin-bottom: 24px;">
+    <div class="progress-bar-bg" style="height: 14px;">
+      <div class="progress-bar-fill {% if quota.percentage > 85 %}danger{% elif quota.percentage > 60 %}warning{% endif %}" style="width: {{ quota.percentage }}%;"></div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; text-align: center; margin-bottom: 24px;">
+    <div style="background-color: var(--bg-tertiary); padding: 16px; border-radius: var(--radius-md);">
+      <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Used Storage</div>
+      <div style="font-size: 20px; font-weight: 700; color: #fff; margin-top: 4px;">{{ quota.used_formatted }}</div>
+    </div>
+    <div style="background-color: var(--bg-tertiary); padding: 16px; border-radius: var(--radius-md);">
+      <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Available Space</div>
+      <div style="font-size: 20px; font-weight: 700; color: #34d399; margin-top: 4px;">{{ quota.available_formatted }}</div>
+    </div>
+    <div style="background-color: var(--bg-tertiary); padding: 16px; border-radius: var(--radius-md);">
+      <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Total Quota</div>
+      <div style="font-size: 20px; font-weight: 700; color: #60a5fa; margin-top: 4px;">{{ quota.total_formatted }}</div>
+    </div>
+  </div>
+
+  <div style="border-top: 1px solid var(--border-color); padding-top: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+    <p>• Quota is calculated recursively across all user directories, subfolders, and files.</p>
+    <p>• Items residing inside <code style="color: #fbbf24;">.trash</code> are strictly excluded from the active quota count.</p>
+    <p>• Uploads exceeding remaining available capacity will be rejected by the server.</p>
+    <p>• System administrators can adjust individual or global quotas via <code style="color: #60a5fa;">STORAGEOS_QUOTA</code>.</p>
+  </div>
+</div>
+{% endblock %}

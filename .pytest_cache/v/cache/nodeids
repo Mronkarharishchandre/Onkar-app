@@ -1,0 +1,14 @@
+[
+  "tests/test_storageos.py::test_activity_logging",
+  "tests/test_storageos.py::test_file_upload_and_download",
+  "tests/test_storageos.py::test_folders_and_nested_structure",
+  "tests/test_storageos.py::test_health_endpoint",
+  "tests/test_storageos.py::test_path_traversal_prevention",
+  "tests/test_storageos.py::test_quota_limits",
+  "tests/test_storageos.py::test_recursive_search",
+  "tests/test_storageos.py::test_sharing_viewer_and_editor_roles",
+  "tests/test_storageos.py::test_trash_restore_and_purge",
+  "tests/test_storageos.py::test_unauthorized_access_redirects_to_login",
+  "tests/test_storageos.py::test_user_isolation",
+  "tests/test_storageos.py::test_user_registration_and_login"
+]

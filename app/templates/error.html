@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}{{ code }} - {{ title }} - StorageOS{% endblock %}
+
+{% block content %}
+<div style="min-height: 60vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px;">
+  <div class="card" style="max-width: 520px; width: 100%; padding: 40px 30px;">
+    <div style="font-size: 56px; font-weight: 800; color: #f43f5e; line-height: 1; margin-bottom: 12px; letter-spacing: -0.04em;">
+      {{ code }}
+    </div>
+    <h1 style="font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 12px;">
+      {{ title }}
+    </h1>
+    <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.6;">
+      {{ message }}
+    </p>
+    <div style="display: flex; gap: 12px; justify-content: center;">
+      <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary">
+        Return to Dashboard
+      </a>
+      <a href="{{ url_for('main.files') }}" class="btn btn-secondary">
+        My Files
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card" style="text-align: center;">
+  <div style="font-size: 56px; font-weight: 800; color: #f43f5e; line-height: 1; margin-bottom: 12px;">
+    {{ code }}
+  </div>
+  <h1 class="auth-title">{{ title }}</h1>
+  <p class="auth-desc" style="margin-bottom: 24px;">{{ message }}</p>
+  <a href="{{ url_for('auth.login') }}" class="btn btn-primary" style="width: 100%; justify-content: center;">
+    Return to Sign In
+  </a>
+</div>
+{% endblock %}

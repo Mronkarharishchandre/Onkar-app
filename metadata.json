@@ -1,0 +1,6 @@
+{
+  "name": "StorageOS",
+  "description": "Self-hosted personal cloud storage platform with secure file management, role-based sharing, trash bin, quota management, activity logging, and DevOps deployment.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,33 @@
+[Unit]
+Description=StorageOS Self-Hosted Personal Cloud Storage Service
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=storageos
+Group=storageos
+WorkingDirectory=/opt/storageos
+Environment="PATH=/opt/storageos/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="STORAGEOS_STORAGE_ROOT=/var/lib/storageos/storage"
+Environment="STORAGEOS_DB_PATH=/var/lib/storageos/database/storageos.db"
+Environment="STORAGEOS_SECRET_KEY=replace_with_secure_random_key"
+Environment="STORAGEOS_DEFAULT_QUOTA_MB=5120"
+EnvironmentFile=-/etc/storageos/storageos.env
+
+ExecStart=/opt/storageos/venv/bin/gunicorn -w 4 -b 127.0.0.1:5000 --access-logfile /var/log/storageos/access.log --error-logfile /var/log/storageos/error.log "app.app:create_app()"
+ExecReload=/bin/kill -s HUP $MAINPID
+
+Restart=always
+RestartSec=5s
+
+# Hardened Linux Security Sandboxing
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/storageos /var/log/storageos
+
+[Install]
+WantedBy=multi-user.target

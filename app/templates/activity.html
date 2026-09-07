@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Log - StorageOS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Activity & Audit Logs</h1>
+    <p class="page-subtitle">Complete chronological record of your account actions and file operations</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Recent Operations
+    </h2>
+    <span class="brand-badge">{{ logs|length }} events</span>
+  </div>
+
+  {% if logs %}
+  <div class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Action Type</th>
+          <th>Affected Item</th>
+          <th>Details</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>
+            {% if log.action in ('UPLOAD', 'RESTORE') %}
+              <span class="brand-badge" style="background-color: rgba(16, 185, 129, 0.2); color: #34d399;">{{ log.action }}</span>
+            {% elif log.action in ('DELETE', 'PERMANENT_DELETE') %}
+              <span class="brand-badge" style="background-color: rgba(244, 63, 94, 0.2); color: #fb7185;">{{ log.action }}</span>
+            {% elif log.action in ('SHARE', 'UPDATE_SHARE') %}
+              <span class="brand-badge" style="background-color: rgba(139, 92, 246, 0.2); color: #a78bfa;">{{ log.action }}</span>
+            {% elif log.action == 'DOWNLOAD' %}
+              <span class="brand-badge" style="background-color: rgba(59, 130, 246, 0.2); color: #60a5fa;">{{ log.action }}</span>
+            {% else %}
+              <span class="brand-badge">{{ log.action }}</span>
+            {% endif %}
+          </td>
+          <td style="font-weight: 500; color: var(--text-primary);">
+            {{ log.filename or '-' }}
+          </td>
+          <td>
+            {{ log.details or '-' }}
+          </td>
+          <td style="font-size: 13px; color: var(--text-muted); white-space: nowrap;">
+            {{ log.created_at }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    <div class="empty-title">No activity logs recorded yet</div>
+    <p style="font-size: 13px;">Operations like uploads, downloads, sharing, and folder management are logged automatically.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

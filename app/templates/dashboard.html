@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - StorageOS{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Welcome, {{ current_user.username }}</h1>
+    <p class="page-subtitle">Your private, secure self-hosted cloud storage space</p>
+  </div>
+  <div class="action-buttons">
+    <a href="{{ url_for('main.files') }}" class="btn btn-secondary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+      Browse All Files
+    </a>
+    <button type="button" class="btn btn-primary" onclick="openModal('quickUploadModal')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+      Upload File
+    </button>
+  </div>
+</div>
+
+<!-- Storage Metrics Cards -->
+<div class="dashboard-grid">
+  <div class="stat-card">
+    <div class="stat-icon blue">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ quota.used_formatted }}</div>
+      <div class="stat-label">Used of {{ quota.total_formatted }} ({{ quota.percentage }}%)</div>
+      <div class="progress-bar-bg" style="margin-top: 8px;">
+        <div class="progress-bar-fill {% if quota.percentage > 85 %}danger{% elif quota.percentage > 60 %}warning{% endif %}" style="width: {{ quota.percentage }}%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon green">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ quota.available_formatted }}</div>
+      <div class="stat-label">Available Free Storage</div>
+    </div>
+  </div>
+
+  <div class="stat-card">
+    <div class="stat-icon purple">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div class="stat-info">
+      <div class="stat-value">{{ other_users|length }}</div>
+      <div class="stat-label">Available Peers to Share With</div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions Row -->
+<div class="card" style="margin-bottom: 28px;">
+  <div class="card-header">
+    <h2 class="card-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      Quick Navigation & Actions
+    </h2>
+  </div>
+  <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+    <button type="button" class="btn btn-secondary" onclick="openModal('quickUploadModal')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+      Upload File
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="openModal('createFolderModal')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" x2="12" y1="11" y2="17"/><line x1="9" x2="15" y1="14" y2="14"/></svg>
+      Create Folder
+    </button>
+    <a href="{{ url_for('main.files') }}" class="btn btn-secondary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+      My Files
+    </a>
+    <a href="{{ url_for('main.shared') }}" class="btn btn-secondary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      Shared With Me
+    </a>
+    <a href="{{ url_for('main.trash') }}" class="btn btn-secondary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
+      Trash
+    </a>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px;">
+  <!-- Recent Files -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Recent Files
+      </h2>
+      <a href="{{ url_for('main.files') }}" style="font-size: 13px; color: #60a5fa;">View all &rarr;</a>
+    </div>
+
+    {% if recent_files %}
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>File Name</th>
+              <th>Size</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for file in recent_files %}
+            <tr>
+              <td>
+                <div class="file-name-cell">
+                  <span class="file-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  </span>
+                  <span style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ file.name }}</span>
+                </div>
+              </td>
+              <td>{{ file.size_formatted }}</td>
+              <td style="text-align: right;">
+                <a href="{{ url_for('main.download_file', rel_path=file.relative_path) }}" class="btn-icon" title="Download">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div class="empty-title">No files yet</div>
+        <p style="font-size: 13px;">Upload your first document, photo, or archive.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Recent Activity -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Recent Activity
+      </h2>
+      <a href="{{ url_for('main.activity') }}" style="font-size: 13px; color: #60a5fa;">Full log &rarr;</a>
+    </div>
+
+    {% if activity %}
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Details</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in activity %}
+            <tr>
+              <td>
+                <span class="brand-badge" style="font-size: 11px;">{{ item.action }}</span>
+              </td>
+              <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {{ item.details or item.filename or '-' }}
+              </td>
+              <td style="font-size: 12px; color: var(--text-muted);">
+                {{ item.created_at }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <div class="empty-title">No activity recorded yet</div>
+        <p style="font-size: 13px;">Actions like upload, download, and share appear here.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal: Quick Upload -->
+<div class="modal-backdrop" id="quickUploadModal">
+  <div class="modal-card">
+    <form action="{{ url_for('main.upload_file') }}" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="current_path" value="">
+
+      <div class="modal-header">
+        <h3 class="modal-title">Upload File to StorageOS</h3>
+        <button type="button" class="modal-close" onclick="closeModal('quickUploadModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="dropzone" id="upload-dropzone" onclick="document.getElementById('file-input').click()">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">Choose a file or drag & drop here</div>
+          <div style="font-size: 13px; color: var(--text-muted);">Maximum size: 100 MB per file</div>
+          <div id="selected-file-name" style="margin-top: 10px; font-weight: 600; color: #60a5fa; display: none;"></div>
+        </div>
+        <input type="file" id="file-input" name="file" style="display: none;" required>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('quickUploadModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Start Upload</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Create Folder -->
+<div class="modal-backdrop" id="createFolderModal">
+  <div class="modal-card">
+    <form action="{{ url_for('main.create_folder') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="current_path" value="">
+
+      <div class="modal-header">
+        <h3 class="modal-title">Create New Folder</h3>
+        <button type="button" class="modal-close" onclick="closeModal('createFolderModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="folder_name">Folder Name</label>
+          <input type="text" id="folder_name" name="folder_name" class="form-control" placeholder="e.g. Documents, Projects, Photos" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('createFolderModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Folder</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
