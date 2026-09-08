@@ -36,7 +36,7 @@
     </div>
     <div style="background-color: var(--bg-secondary); border: 1px solid var(--border-color); padding: 16px; border-radius: var(--radius-md);">
       <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Total Quota</div>
-      <div style="font-size: 20px; font-weight: 700; color: var(--brand-blue); margin-top: 4px;">{{ quota.total_formatted }}</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-top: 4px;">{{ quota.total_formatted }}</div>
     </div>
   </div>
 
@@ -44,7 +44,7 @@
     <p>• Quota is calculated recursively across all user directories, subfolders, and files.</p>
     <p>• Items residing inside <code style="color: var(--warning);">.trash</code> are strictly excluded from the active quota count.</p>
     <p>• Uploads exceeding remaining available capacity will be rejected by the server.</p>
-    <p>• System administrators can adjust individual or global quotas via <code style="color: var(--brand-blue);">STORAGEOS_QUOTA</code>.</p>
+    <p>• System administrators can adjust individual or global quotas via <code style="color: var(--brand-red);">STORAGEOS_QUOTA</code>.</p>
   </div>
 </div>
 {% endblock %}
