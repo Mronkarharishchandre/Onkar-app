@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}StorageOS - Enterprise Cloud Storage{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   
   <!-- Modern Font Stack -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,8 +36,13 @@
     <aside class="sidebar" id="app-sidebar">
       <div class="sidebar-brand">
         <div class="brand-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 8 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+          <svg class="storageos-symbol" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path class="storageos-cube-top" d="M16 2.5L27.2 8.9L16 15.3L4.8 8.9L16 2.5Z"/>
+            <path class="storageos-cube-left" d="M4 10.5L15.2 16.9V29.5L4 23.1V10.5Z"/>
+            <path class="storageos-cube-blades" d="M6.8 15.5L12.4 18.7" stroke-width="1.2" stroke-linecap="round"/>
+            <path class="storageos-cube-blades" d="M6.8 19.5L12.4 22.7" stroke-width="1.2" stroke-linecap="round"/>
+            <path class="storageos-cube-right" d="M16.8 16.9L28 10.5V23.1L16.8 29.5V16.9Z"/>
+            <path class="storageos-cube-contour" d="M20.5 19.8L24.5 17.5V22.8L20.5 25.1V19.8Z"/>
           </svg>
         </div>
         <div class="brand-meta">

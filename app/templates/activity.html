@@ -35,15 +35,15 @@
         <tr>
           <td>
             {% if log.action in ('UPLOAD', 'RESTORE') %}
-              <span class="brand-badge" style="background-color: rgba(16, 185, 129, 0.2); color: #34d399;">{{ log.action }}</span>
+              <span class="badge badge-success">{{ log.action }}</span>
             {% elif log.action in ('DELETE', 'PERMANENT_DELETE') %}
-              <span class="brand-badge" style="background-color: rgba(244, 63, 94, 0.2); color: #fb7185;">{{ log.action }}</span>
+              <span class="badge badge-danger">{{ log.action }}</span>
             {% elif log.action in ('SHARE', 'UPDATE_SHARE') %}
-              <span class="brand-badge" style="background-color: rgba(139, 92, 246, 0.2); color: #a78bfa;">{{ log.action }}</span>
+              <span class="badge badge-primary">{{ log.action }}</span>
             {% elif log.action == 'DOWNLOAD' %}
-              <span class="brand-badge" style="background-color: rgba(59, 130, 246, 0.2); color: #60a5fa;">{{ log.action }}</span>
+              <span class="badge badge-neutral">{{ log.action }}</span>
             {% else %}
-              <span class="brand-badge">{{ log.action }}</span>
+              <span class="badge badge-neutral">{{ log.action }}</span>
             {% endif %}
           </td>
           <td style="font-weight: 500; color: var(--text-primary);">

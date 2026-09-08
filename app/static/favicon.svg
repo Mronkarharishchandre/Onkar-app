@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- StorageOS Favicon -->
+  <path d="M16 2.5L27.2 8.9L16 15.3L4.8 8.9L16 2.5Z" fill="#0066CC"/>
+  <path d="M4 10.5L15.2 16.9V29.5L4 23.1V10.5Z" fill="#0B1F33"/>
+  <path d="M6.8 15.5L12.4 18.7" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M6.8 19.5L12.4 22.7" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M16.8 16.9L28 10.5V23.1L16.8 29.5V16.9Z" fill="#1473E6"/>
+  <path d="M20.5 19.8L24.5 17.5V22.8L20.5 25.1V19.8Z" fill="#FFFFFF" fill-opacity="0.3"/>
+</svg>
