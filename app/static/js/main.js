@@ -81,8 +81,10 @@ function toggleMobileSidebar(show) {
 }
 
 /* ==========================================================================
-   Dropdowns & Three-Dot (⋮) Menus
+   Dropdowns & Three-Dot (⋮) Menus (Smart Viewport-Aware Positioning)
    ========================================================================== */
+let activeItemMenuState = null;
+
 function toggleDropdown(dropdownId) {
   const dropdown = document.getElementById(dropdownId);
   if (!dropdown) return;
@@ -94,6 +96,105 @@ function toggleDropdown(dropdownId) {
   }
 }
 
+function positionItemMenu(button, menu) {
+  if (!button || !menu) return;
+
+  const btnRect = button.getBoundingClientRect();
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+
+  // Viewport padding margin and gap between button & dropdown
+  const margin = 10;
+  const gap = 6;
+
+  // Temporarily make visible to accurately measure natural dimensions
+  const prevDisplay = menu.style.display;
+  const prevVis = menu.style.visibility;
+  const prevMaxHeight = menu.style.maxHeight;
+  const prevOverflow = menu.style.overflowY;
+
+  menu.style.maxHeight = 'none';
+  menu.style.overflowY = 'visible';
+  menu.style.visibility = 'hidden';
+  menu.style.display = 'block';
+
+  const menuHeight = menu.offsetHeight || menu.scrollHeight || 220;
+  const menuWidth = menu.offsetWidth || 200;
+
+  menu.style.visibility = prevVis;
+  menu.style.display = prevDisplay;
+  menu.style.maxHeight = prevMaxHeight;
+  menu.style.overflowY = prevOverflow;
+
+  // Available vertical space calculations
+  const spaceBelow = vh - btnRect.bottom - margin;
+  const spaceAbove = btnRect.top - margin;
+
+  // Direction decision:
+  // 1. If space below fits menu -> open downward (preferred for top / upper items)
+  // 2. If space below is not enough, but space above fits -> open upward (for bottom items)
+  // 3. If neither fits fully -> open in the direction with more available space
+  let openUpward = false;
+  if (spaceBelow >= menuHeight + gap) {
+    openUpward = false;
+  } else if (spaceAbove >= menuHeight + gap) {
+    openUpward = true;
+  } else {
+    openUpward = spaceAbove > spaceBelow;
+  }
+
+  // Constrain max-height if viewport space is tight, and enable internal scrolling
+  const availableVerticalSpace = openUpward ? (spaceAbove - gap) : (spaceBelow - gap);
+  const constrainedMaxHeight = Math.max(100, availableVerticalSpace);
+
+  if (menuHeight > availableVerticalSpace) {
+    menu.style.maxHeight = `${constrainedMaxHeight}px`;
+    menu.style.overflowY = 'auto';
+    menu.style.overscrollBehavior = 'contain';
+  } else {
+    menu.style.maxHeight = '';
+    menu.style.overflowY = '';
+    menu.style.overscrollBehavior = '';
+  }
+
+  // Set vertical coordinates
+  if (openUpward) {
+    menu.classList.add('drop-up');
+    menu.classList.remove('drop-down');
+    const bottomPos = vh - btnRect.top + gap;
+    menu.style.top = 'auto';
+    menu.style.bottom = `${bottomPos}px`;
+  } else {
+    menu.classList.add('drop-down');
+    menu.classList.remove('drop-up');
+    const topPos = btnRect.bottom + gap;
+    menu.style.top = `${topPos}px`;
+    menu.style.bottom = 'auto';
+  }
+
+  // Horizontal placement & collision prevention (Never clipped by left or right edges)
+  const rightDistance = vw - btnRect.right;
+  const leftEdgeIfRightAligned = btnRect.right - menuWidth;
+
+  if (leftEdgeIfRightAligned < margin) {
+    // If aligning to button's right edge would push menu off screen to the left
+    const safeLeft = Math.max(margin, btnRect.left);
+    menu.style.left = `${safeLeft}px`;
+    menu.style.right = 'auto';
+    menu.style.maxWidth = `${vw - safeLeft - margin}px`;
+  } else if (rightDistance < margin) {
+    // If the button is right at or beyond the right margin
+    menu.style.right = `${margin}px`;
+    menu.style.left = 'auto';
+    menu.style.maxWidth = `${vw - 2 * margin}px`;
+  } else {
+    // Standard right-alignment with trigger button
+    menu.style.right = `${rightDistance}px`;
+    menu.style.left = 'auto';
+    menu.style.maxWidth = `${vw - 2 * margin}px`;
+  }
+}
+
 function toggleItemMenu(event, menuId) {
   if (event) {
     event.stopPropagation();
@@ -102,17 +203,51 @@ function toggleItemMenu(event, menuId) {
   const menu = document.getElementById(menuId);
   if (!menu) return;
 
+  const button = (event && event.currentTarget) ? event.currentTarget :
+                 (event && event.target ? event.target.closest('button') : null) ||
+                 (menu.previousElementSibling && menu.previousElementSibling.tagName === 'BUTTON' ? menu.previousElementSibling : menu.closest('.item-menu-container')?.querySelector('button'));
+
   const isOpen = menu.classList.contains('show');
   closeAllDropdowns();
-  if (!isOpen) {
+
+  if (!isOpen && button) {
     menu.classList.add('show');
+    positionItemMenu(button, menu);
+    activeItemMenuState = { button, menu, menuId };
   }
+}
+
+function handleMenuReposition() {
+  if (!activeItemMenuState || !activeItemMenuState.menu.classList.contains('show')) return;
+  const { button, menu } = activeItemMenuState;
+
+  const btnRect = button.getBoundingClientRect();
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+
+  // If the trigger button has scrolled completely out of view, close the menu
+  if (btnRect.bottom < 0 || btnRect.top > vh || btnRect.right < 0 || btnRect.left > vw) {
+    closeAllDropdowns();
+    return;
+  }
+
+  // Smoothly reposition menu attached to the trigger button
+  positionItemMenu(button, menu);
 }
 
 function closeAllDropdowns() {
   document.querySelectorAll('.topbar-dropdown.show, .item-dropdown-menu.show').forEach(el => {
-    el.classList.remove('show');
+    el.classList.remove('show', 'drop-up', 'drop-down');
+    el.style.top = '';
+    el.style.bottom = '';
+    el.style.left = '';
+    el.style.right = '';
+    el.style.maxHeight = '';
+    el.style.overflowY = '';
+    el.style.maxWidth = '';
+    el.style.overscrollBehavior = '';
   });
+  activeItemMenuState = null;
 }
 
 /* ==========================================================================
@@ -121,10 +256,16 @@ function closeAllDropdowns() {
 function initGlobalListeners() {
   // Close dropdowns on outside click
   document.addEventListener('click', function (e) {
-    if (!e.target.closest('.dropdown-container') && !e.target.closest('.item-menu-container')) {
+    if (!e.target.closest('.dropdown-container') && 
+        !e.target.closest('.item-menu-container') && 
+        !e.target.closest('.item-dropdown-menu')) {
       closeAllDropdowns();
     }
   });
+
+  // Reposition active menu on scroll or window resize so it never detaches
+  window.addEventListener('scroll', handleMenuReposition, { passive: true, capture: true });
+  window.addEventListener('resize', handleMenuReposition, { passive: true });
 
   // Close modals or menus on Escape
   document.addEventListener('keydown', function (e) {

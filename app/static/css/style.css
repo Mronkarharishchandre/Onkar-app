@@ -1158,29 +1158,75 @@ button {
 }
 
 /* ==========================================================================
-   Improved File Action Menu (⋮)
+   Improved File Action Menu (⋮) - Viewport-Aware Smart Positioning
    ========================================================================== */
 .item-menu-container {
   position: relative;
 }
 
 .item-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  position: fixed;
+  z-index: 95;
   min-width: 200px;
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-dropdown);
   padding: 6px;
-  z-index: 70;
   display: none;
+  box-sizing: border-box;
 }
 
 .item-dropdown-menu.show {
   display: block;
-  animation: dropdownFadeIn 0.15s ease;
+}
+
+.item-dropdown-menu.drop-down.show {
+  animation: dropdownFadeInDown 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.item-dropdown-menu.drop-up.show {
+  animation: dropdownFadeInUp 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dropdownFadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dropdownFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom smooth scrollbar when menu has internal scrolling */
+.item-dropdown-menu::-webkit-scrollbar {
+  width: 5px;
+}
+
+.item-dropdown-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.item-dropdown-menu::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+}
+
+.item-dropdown-menu::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
 }
 
 .item-menu-entry {
