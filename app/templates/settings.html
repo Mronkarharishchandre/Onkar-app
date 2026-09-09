@@ -8,16 +8,18 @@
   <div class="page-header">
     <div>
       <h1 class="page-title">{{ t('settings') }}</h1>
-      <p class="page-subtitle">{{ t('profile') }} &bull; Appearance, Security & Localization</p>
+      <p class="page-subtitle">Configure your account, appearance, storage, security, and file preferences.</p>
     </div>
   </div>
 
   <div class="settings-grid">
-    <!-- Left Column: Profile & Appearance -->
+    <!-- Left Column: 1. ACCOUNT, 2. APPEARANCE, 5. FILE PREFERENCES -->
     <div class="settings-column">
       
-      <!-- Profile & Preferences Card -->
-      <div class="card">
+      <!-- ========================================== -->
+      <!-- 1. ACCOUNT SECTION                        -->
+      <!-- ========================================== -->
+      <div class="card" id="section-account">
         <div class="card-header">
           <div class="card-header-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -25,8 +27,8 @@
             </svg>
           </div>
           <div>
-            <h2 class="card-title">{{ t('profile') }}</h2>
-            <div class="card-subtitle">Manage your personal information and preferences</div>
+            <h2 class="card-title">Account</h2>
+            <div class="card-subtitle">Manage your personal details and identity</div>
           </div>
         </div>
         <div class="card-body">
@@ -49,64 +51,193 @@
                   {{ user.email }}
                 </div>
               {% endif %}
-              {% if user.google_id %}
-                <span class="badge badge-success" style="margin-top: 6px; display: inline-flex; align-items: center; gap: 4px;">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-                  </svg>
-                  Google Linked
-                </span>
-              {% endif %}
             </div>
           </div>
 
           <hr class="settings-divider" />
 
-          <form method="POST" action="{{ url_for('main.update_preferences') }}">
+          <form method="POST" action="{{ url_for('main.update_account_settings') }}" id="form-account-settings">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            
+
             <div class="form-group">
-              <label class="form-label" for="pref_display_name">{{ t('display_name') }}</label>
-              <input type="text" id="pref_display_name" name="display_name" class="form-control" value="{{ user.display_name or '' }}" placeholder="{{ user.username }}">
+              <label class="form-label" for="account_display_name">{{ t('display_name') }}</label>
+              <input type="text" id="account_display_name" name="display_name" class="form-control" value="{{ user.display_name or '' }}" placeholder="{{ user.username }}">
+              <div class="form-hint">Public name visible on shared items and header.</div>
             </div>
 
-            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-              <div class="form-group">
-                <label class="form-label" for="pref_theme">{{ t('theme') }}</label>
-                <select id="pref_theme" name="theme" class="form-control">
-                  <option value="system" {% if current_theme == 'system' %}selected{% endif %}>{{ t('system_default') }}</option>
-                  <option value="light" {% if current_theme == 'light' %}selected{% endif %}>{{ t('light_mode') }}</option>
-                  <option value="dark" {% if current_theme == 'dark' %}selected{% endif %}>{{ t('dark_mode') }}</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label" for="pref_language">{{ t('language') }}</label>
-                <select id="pref_language" name="language" class="form-control">
-                  {% for code, lang_meta in supported_languages.items() %}
-                    <option value="{{ code }}" {% if current_lang == code %}selected{% endif %}>
-                      {{ lang_meta.native }} ({{ lang_meta.name }})
-                    </option>
-                  {% endfor %}
-                </select>
-              </div>
+            <div class="form-group">
+              <label class="form-label" for="account_email">Email Address</label>
+              <input type="email" id="account_email" name="email" class="form-control" value="{{ user.email or '' }}" placeholder="name@domain.com">
+              <div class="form-hint">Used for notifications and account communications.</div>
             </div>
 
-            <button type="submit" class="btn btn-primary" style="margin-top: 10px;">
+            <div style="background-color: var(--bg-secondary); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+              <span>Looking to update your account password?</span>
+              <a href="#section-security" class="btn btn-secondary btn-sm" style="flex-shrink: 0;">Change Password</a>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
               </svg>
-              {{ t('save_changes') }}
+              Save Account Changes
             </button>
           </form>
         </div>
       </div>
 
-      <!-- Storage Quota Summary Card -->
-      <div class="card" style="margin-top: 24px;">
+      <!-- ========================================== -->
+      <!-- 2. APPEARANCE SECTION                     -->
+      <!-- ========================================== -->
+      <div class="card" id="section-appearance">
+        <div class="card-header">
+          <div class="card-header-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="card-title">Appearance</h2>
+            <div class="card-subtitle">Personalize your theme mode and preferred interface language</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="{{ url_for('main.update_preferences') }}" id="form-appearance-settings">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="theme" id="selected_theme_input" value="{{ current_theme or 'system' }}">
+
+            <div class="form-group">
+              <label class="form-label">Theme Mode</label>
+              <div class="theme-options-grid">
+                <button type="button" class="theme-option-btn {% if current_theme == 'system' or not current_theme %}active{% endif %}" onclick="selectThemeOption('system')" id="theme-card-system">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>
+                  </svg>
+                  <span>System</span>
+                </button>
+
+                <button type="button" class="theme-option-btn {% if current_theme == 'light' %}active{% endif %}" onclick="selectThemeOption('light')" id="theme-card-light">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/>
+                  </svg>
+                  <span>Light</span>
+                </button>
+
+                <button type="button" class="theme-option-btn {% if current_theme == 'dark' %}active{% endif %}" onclick="selectThemeOption('dark')" id="theme-card-dark">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                  </svg>
+                  <span>Dark</span>
+                </button>
+              </div>
+              <div class="form-hint">System mode automatically syncs with your operating system preferences.</div>
+            </div>
+
+            <div class="form-group" style="margin-top: 18px;">
+              <label class="form-label" for="appearance_language">Interface Language</label>
+              <select id="appearance_language" name="language" class="form-control">
+                {% for code, lang_meta in supported_languages.items() %}
+                  <option value="{{ code }}" {% if current_lang == code %}selected{% endif %}>
+                    {{ lang_meta.native }} ({{ lang_meta.name }})
+                  </option>
+                {% endfor %}
+              </select>
+              <div class="form-hint">Select the language used across navigation, messages, and dialogues.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="margin-top: 8px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Save Appearance
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- 5. FILE PREFERENCES SECTION               -->
+      <!-- ========================================== -->
+      <div class="card" id="section-file-preferences">
+        <div class="card-header">
+          <div class="card-header-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="card-title">File Preferences</h2>
+            <div class="card-subtitle">Set your default viewing layouts and safety behaviors</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="{{ url_for('main.update_file_preferences') }}" id="form-file-preferences">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="file_view" id="selected_file_view_input" value="{{ user.file_view or 'list' }}">
+
+            <div class="form-group">
+              <label class="form-label">Default View Mode</label>
+              <div class="view-options-grid">
+                <button type="button" class="view-option-btn {% if user.file_view != 'grid' %}active{% endif %}" onclick="selectFileViewOption('list')" id="view-mode-btn-list">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/>
+                    <line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>
+                  </svg>
+                  <span>List View</span>
+                </button>
+
+                <button type="button" class="view-option-btn {% if user.file_view == 'grid' %}active{% endif %}" onclick="selectFileViewOption('grid')" id="view-mode-btn-grid">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/>
+                    <rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>
+                  </svg>
+                  <span>Grid View</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 18px;">
+              <label class="form-label" for="pref_sort_order">Default Sorting</label>
+              <select id="pref_sort_order" name="sort_preference" class="form-control">
+                <option value="name_asc" {% if user.sort_preference == 'name_asc' or not user.sort_preference %}selected{% endif %}>Name (A &rarr; Z)</option>
+                <option value="name_desc" {% if user.sort_preference == 'name_desc' %}selected{% endif %}>Name (Z &rarr; A)</option>
+                <option value="date_desc" {% if user.sort_preference == 'date_desc' %}selected{% endif %}>Date Modified (Newest first)</option>
+                <option value="date_asc" {% if user.sort_preference == 'date_asc' %}selected{% endif %}>Date Modified (Oldest first)</option>
+                <option value="size_desc" {% if user.sort_preference == 'size_desc' %}selected{% endif %}>Size (Largest first)</option>
+                <option value="size_asc" {% if user.sort_preference == 'size_asc' %}selected{% endif %}>Size (Smallest first)</option>
+              </select>
+              <div class="form-hint">Determines default ordering for files and folders.</div>
+            </div>
+
+            <div class="form-group" style="margin-top: 18px;">
+              <label class="settings-checkbox-card" for="pref_confirm_delete">
+                <input type="checkbox" id="pref_confirm_delete" name="confirm_delete" value="1" {% if user.confirm_delete is not none and user.confirm_delete != 0 %}checked{% elif user.confirm_delete is none %}checked{% endif %}>
+                <div>
+                  <div class="settings-checkbox-label">Confirm before delete</div>
+                  <p class="settings-checkbox-desc">Always prompt for confirmation before moving files or folders to trash.</p>
+                </div>
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="margin-top: 8px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Save File Preferences
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: 3. STORAGE, 4. SECURITY, 6. ABOUT STORAGEOS -->
+    <div class="settings-column">
+      
+      <!-- ========================================== -->
+      <!-- 3. STORAGE SECTION                        -->
+      <!-- ========================================== -->
+      <div class="card" id="section-storage">
         <div class="card-header">
           <div class="card-header-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -114,39 +245,59 @@
             </svg>
           </div>
           <div>
-            <h2 class="card-title">{{ t('storage_quota') }}</h2>
-            <div class="card-subtitle">{{ quota.used_formatted }} of {{ quota.quota_formatted }} used</div>
+            <h2 class="card-title">Storage</h2>
+            <div class="card-subtitle">Volume capacity, allocated quota, and utilization breakdown</div>
           </div>
         </div>
         <div class="card-body">
-          <div class="quota-bar-wrapper">
-            <div class="quota-bar" style="height: 10px; border-radius: 5px;">
-              <div class="quota-fill {% if quota.percent_used >= 90 %}danger{% elif quota.percent_used >= 75 %}warning{% endif %}" style="width: {{ quota.percent_used }}%;"></div>
+          <!-- Metric Triplets -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
+            <div style="background-color: var(--bg-secondary); border-radius: var(--radius-md); padding: 14px 12px; text-align: center; border: 1px solid var(--border-color);">
+              <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Total Storage</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">{{ quota.quota_formatted }}</div>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-top: 8px; color: var(--text-secondary);">
-              <span>{{ quota.percent_used }}% utilized</span>
-              <span>{{ quota.available_formatted }} available</span>
+
+            <div style="background-color: var(--bg-secondary); border-radius: var(--radius-md); padding: 14px 12px; text-align: center; border: 1px solid var(--border-color);">
+              <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Used Storage</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--brand-red);">{{ quota.used_formatted }}</div>
+            </div>
+
+            <div style="background-color: var(--bg-secondary); border-radius: var(--radius-md); padding: 14px 12px; text-align: center; border: 1px solid var(--border-color);">
+              <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Available</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--success);">{{ quota.available_formatted }}</div>
             </div>
           </div>
 
-          <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <a href="{{ url_for('main.quota') }}" class="btn btn-secondary btn-sm">
-              View Detailed Quota Breakdown
+          <!-- Storage Usage Progress Bar -->
+          <div class="quota-bar-wrapper">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 6px;">
+              <span style="font-weight: 600; color: var(--text-primary);">Storage Usage</span>
+              <span style="font-weight: 700; color: {% if quota.percent_used >= 90 %}var(--danger){% elif quota.percent_used >= 75 %}var(--warning){% else %}var(--text-primary){% endif %};">{{ quota.percent_used }}% utilized</span>
+            </div>
+            <div class="quota-bar" style="height: 12px; border-radius: 6px; background-color: var(--bg-secondary); overflow: hidden; border: 1px solid var(--border-color);">
+              <div class="quota-fill {% if quota.percent_used >= 90 %}danger{% elif quota.percent_used >= 75 %}warning{% endif %}" style="width: {{ quota.percent_used }}%; height: 100%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px; color: var(--text-secondary);">
+              <span>{{ quota.used_formatted }} used</span>
+              <span>{{ quota.available_formatted }} remaining</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 22px;">
+            <a href="{{ url_for('main.quota') }}" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center;">
+              Detailed Breakdown
             </a>
-            <a href="{{ url_for('main.trash') }}" class="btn btn-secondary btn-sm">
+            <a href="{{ url_for('main.trash') }}" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center;">
               Manage Trash
             </a>
           </div>
         </div>
       </div>
 
-    </div>
-
-    <!-- Right Column: Security & Public Share Links -->
-    <div class="settings-column">
-      
-      <!-- Password & Security Card -->
-      <div class="card">
+      <!-- ========================================== -->
+      <!-- 4. SECURITY SECTION                       -->
+      <!-- ========================================== -->
+      <div class="card" id="section-security">
         <div class="card-header">
           <div class="card-header-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -154,116 +305,120 @@
             </svg>
           </div>
           <div>
-            <h2 class="card-title">{{ t('security') }}</h2>
-            <div class="card-subtitle">{{ t('change_password') }} and credential verification</div>
+            <h2 class="card-title">Security</h2>
+            <div class="card-subtitle">Credential protection and session management</div>
           </div>
         </div>
         <div class="card-body">
-          <form method="POST" action="{{ url_for('main.update_password_route') }}">
+          <form method="POST" action="{{ url_for('main.update_password_route') }}" id="form-update-password">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
             <div class="form-group">
               <label class="form-label" for="sec_curr_pass">{{ t('current_password') }}</label>
-              <input type="password" id="sec_curr_pass" name="current_password" class="form-control" required autocomplete="current-password">
+              <input type="password" id="sec_curr_pass" name="current_password" class="form-control" required autocomplete="current-password" placeholder="••••••••">
             </div>
 
-            <div class="form-group">
-              <label class="form-label" for="sec_new_pass">{{ t('new_password') }}</label>
-              <input type="password" id="sec_new_pass" name="new_password" class="form-control" required minlength="8" autocomplete="new-password">
-              <div class="form-hint">Must be at least 8 characters with upper, lower, and numeric characters.</div>
+            <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div class="form-group">
+                <label class="form-label" for="sec_new_pass">{{ t('new_password') }}</label>
+                <input type="password" id="sec_new_pass" name="new_password" class="form-control" required minlength="8" autocomplete="new-password" placeholder="At least 8 chars">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec_conf_pass">{{ t('confirm_password') }}</label>
+                <input type="password" id="sec_conf_pass" name="confirm_password" class="form-control" required minlength="8" autocomplete="new-password" placeholder="Confirm password">
+              </div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label" for="sec_conf_pass">{{ t('confirm_password') }}</label>
-              <input type="password" id="sec_conf_pass" name="confirm_password" class="form-control" required minlength="8" autocomplete="new-password">
-            </div>
-
-            <button type="submit" class="btn btn-secondary" style="margin-top: 10px;">
+            <button type="submit" class="btn btn-secondary" style="margin-top: 6px;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
               {{ t('update_password') }}
             </button>
           </form>
+
+          <hr class="settings-divider" style="margin: 22px 0;" />
+
+          <!-- Logout All Active Sessions -->
+          <div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Session Management</div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.4;">
+              Signed in on another browser or device? Invalidate all active sessions to ensure account protection.
+            </p>
+
+            <form method="POST" action="{{ url_for('main.logout_all_sessions') }}" onsubmit="return confirm('Are you sure you want to terminate all active sessions? You will need to log back in.');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--danger); border-color: rgba(220, 38, 38, 0.3);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>
+                </svg>
+                Log Out All Sessions
+              </button>
+            </form>
+          </div>
         </div>
       </div>
 
-      <!-- Public Share Links Card -->
-      <div class="card" style="margin-top: 24px;">
+      <!-- ========================================== -->
+      <!-- 6. ABOUT STORAGEOS SECTION                -->
+      <!-- ========================================== -->
+      <div class="card" id="section-about">
         <div class="card-header">
           <div class="card-header-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            <svg class="storageos-symbol" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 18px; height: 18px;">
+              <path class="storageos-cube-top" d="M16 2.5L27.2 8.9L16 15.3L4.8 8.9L16 2.5Z"/>
+              <path class="storageos-cube-left" d="M4 10.5L15.2 16.9V29.5L4 23.1V10.5Z"/>
+              <path class="storageos-cube-right" d="M16.8 16.9L28 10.5V23.1L16.8 29.5V16.9Z"/>
             </svg>
           </div>
-          <div>
-            <h2 class="card-title">{{ t('share_links') }}</h2>
-            <div class="card-subtitle">Active tokenized public links generated by you</div>
+          <div style="flex: 1; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <h2 class="card-title">About StorageOS</h2>
+              <div class="card-subtitle">Platform version, architecture, and system health</div>
+            </div>
+            <span class="about-status-pill">
+              <span class="about-status-dot"></span>
+              {{ system_status.status }}
+            </span>
           </div>
         </div>
         <div class="card-body">
-          {% if share_links %}
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>{{ t('filename') }}</th>
-                    <th>Expires</th>
-                    <th>Views</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for link in share_links %}
-                    <tr>
-                      <td style="font-weight: 500;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                          </svg>
-                          <span class="truncate-text" style="max-width: 160px;" title="{{ link.filename }}">{{ link.filename }}</span>
-                          {% if link.has_password %}
-                            <span title="Password Protected" style="color: var(--brand-red);">
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                              </svg>
-                            </span>
-                          {% endif %}
-                        </div>
-                      </td>
-                      <td style="font-size: 12px; color: var(--text-secondary);">
-                        {{ link.expires_at or 'Never' }}
-                      </td>
-                      <td>
-                        <span class="badge badge-neutral">{{ link.views }}</span>
-                      </td>
-                      <td>
-                        <div style="display: flex; gap: 6px;">
-                          <button type="button" class="btn btn-icon btn-sm" title="Copy Link" onclick="copyLinkUrl('{{ url_for('main.view_shared_link', token=link.token, _external=True) }}')">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                              <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                            </svg>
-                          </button>
-                          <form method="POST" action="{{ url_for('main.revoke_public_share_link', link_id=link.id) }}" onsubmit="return confirm('Revoke this share link? Anyone using it will immediately lose access.');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button type="submit" class="btn btn-icon btn-sm danger" title="Revoke Link">
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
-                              </svg>
-                            </button>
-                          </form>
-                        </div>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+          <div class="about-specs-list">
+            <div class="about-spec-row">
+              <span class="about-spec-label">Version</span>
+              <span class="about-spec-value">{{ system_status.version }}</span>
             </div>
-          {% else %}
-            <div class="empty-state mini">
-              <p>No active public share links created yet. Click "Share" on any file to create one.</p>
+            <div class="about-spec-row">
+              <span class="about-spec-label">Edition</span>
+              <span class="about-spec-value">{{ system_status.edition }}</span>
             </div>
-          {% endif %}
+            <div class="about-spec-row">
+              <span class="about-spec-label">System Health</span>
+              <span class="about-spec-value" style="color: var(--success);">{{ system_status.status }} &bull; Healthy</span>
+            </div>
+            <div class="about-spec-row">
+              <span class="about-spec-label">Database</span>
+              <span class="about-spec-value">{{ system_status.database }}</span>
+            </div>
+            <div class="about-spec-row">
+              <span class="about-spec-label">Storage Architecture</span>
+              <span class="about-spec-value">{{ system_status.storage }}</span>
+            </div>
+            <div class="about-spec-row">
+              <span class="about-spec-label">Cryptography</span>
+              <span class="about-spec-value">{{ system_status.security }}</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+            <p style="margin-bottom: 6px;">
+              StorageOS is an enterprise-grade cloud storage and file management platform providing isolated user volumes and cryptographically hashed credentials.
+            </p>
+            <p style="margin: 0; color: var(--text-muted);">
+              &copy; 2026 StorageOS Systems. All rights reserved.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -272,12 +427,27 @@
 </div>
 
 <script>
-function copyLinkUrl(url) {
-  navigator.clipboard.writeText(url).then(function() {
-    alert("Share URL copied to clipboard!");
-  }).catch(function() {
-    prompt("Copy link:", url);
-  });
+// Interactive Theme Selector synced with Base Theme Switcher
+function selectThemeOption(theme) {
+  document.getElementById('selected_theme_input').value = theme;
+  document.querySelectorAll('.theme-option-btn').forEach(btn => btn.classList.remove('active'));
+  const targetBtn = document.getElementById('theme-card-' + theme);
+  if (targetBtn) targetBtn.classList.add('active');
+
+  // Immediately preview the theme live
+  if (typeof applyThemeMode === 'function') {
+    applyThemeMode(theme);
+  } else {
+    document.documentElement.setAttribute('data-theme', theme === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme);
+  }
+}
+
+// Interactive File View Mode Selector
+function selectFileViewOption(mode) {
+  document.getElementById('selected_file_view_input').value = mode;
+  document.querySelectorAll('.view-option-btn').forEach(btn => btn.classList.remove('active'));
+  const targetBtn = document.getElementById('view-mode-btn-' + mode);
+  if (targetBtn) targetBtn.classList.add('active');
 }
 </script>
 {% endblock %}

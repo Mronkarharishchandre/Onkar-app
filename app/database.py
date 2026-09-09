@@ -166,6 +166,10 @@ def init_db():
             ("avatar_url", "TEXT"),
             ("theme", "TEXT DEFAULT 'system'"),
             ("language", "TEXT DEFAULT 'en'"),
+            ("file_view", "TEXT DEFAULT 'list'"),
+            ("sort_preference", "TEXT DEFAULT 'name_asc'"),
+            ("confirm_delete", "INTEGER DEFAULT 1"),
+            ("session_version", "INTEGER DEFAULT 1"),
         ]
         for col_name, col_def in user_cols:
             try:
@@ -219,13 +223,13 @@ def create_user(username: str, password_hash: str) -> int:
 
 
 def get_user_by_username(username: str):
-    """Retrieve user record by username."""
+    """Retrieve full user record by username."""
     with db_session() as conn:
         cursor = conn.execute(
             """
-            SELECT id, username, password_hash, created_at
+            SELECT *
             FROM users
-            WHERE username = ?;
+            WHERE username = ? COLLATE NOCASE;
             """,
             (username.strip(),),
         )
@@ -234,11 +238,11 @@ def get_user_by_username(username: str):
 
 
 def get_user_by_id(user_id: int):
-    """Retrieve user record by user ID."""
+    """Retrieve full user record by user ID."""
     with db_session() as conn:
         cursor = conn.execute(
             """
-            SELECT id, username, password_hash, created_at
+            SELECT *
             FROM users
             WHERE id = ?;
             """,
@@ -285,23 +289,54 @@ def get_user_by_email(email: str):
         return dict(row) if row else None
 
 
-def update_user_preferences(user_id: int, theme: str = None, language: str = None, display_name: str = None):
-    """Update user appearance and localization preferences."""
+def update_user_preferences(
+    user_id: int,
+    theme: str = None,
+    language: str = None,
+    display_name: str = None,
+    email: str = None,
+    file_view: str = None,
+    sort_preference: str = None,
+    confirm_delete: int = None,
+):
+    """Update user appearance, localization, account profile, and file preferences."""
     with db_session() as conn:
         fields = []
         params = []
-        if theme:
+        if theme is not None:
             fields.append("theme = ?")
             params.append(theme)
-        if language:
+        if language is not None:
             fields.append("language = ?")
             params.append(language)
         if display_name is not None:
             fields.append("display_name = ?")
             params.append(display_name.strip())
+        if email is not None:
+            fields.append("email = ?")
+            params.append(email.strip())
+        if file_view is not None:
+            fields.append("file_view = ?")
+            params.append(file_view.strip().lower())
+        if sort_preference is not None:
+            fields.append("sort_preference = ?")
+            params.append(sort_preference.strip())
+        if confirm_delete is not None:
+            fields.append("confirm_delete = ?")
+            params.append(1 if confirm_delete else 0)
+
         if fields:
             params.append(user_id)
             conn.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?;", params)
+
+
+def increment_user_session_version(user_id: int):
+    """Increment the session version to invalidate all active sessions across devices."""
+    with db_session() as conn:
+        conn.execute(
+            "UPDATE users SET session_version = COALESCE(session_version, 1) + 1 WHERE id = ?;",
+            (user_id,),
+        )
 
 
 def update_user_password(user_id: int, password_hash: str):

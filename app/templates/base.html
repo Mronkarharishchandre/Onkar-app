@@ -129,17 +129,36 @@
     <div class="main-wrapper">
       <!-- Topbar -->
       <header class="topbar">
+        <!-- LEFT: StorageOS Branding & Navigation Area -->
         <div class="topbar-left">
           <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle navigation" onclick="toggleMobileSidebar(true)">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
           </button>
-          
-          <form class="search-form" action="{{ url_for('main.search') }}" method="GET">
+
+          <a href="{{ url_for('main.dashboard') }}" class="topbar-brand" title="StorageOS Dashboard">
+            <div class="topbar-brand-icon">
+              <svg class="storageos-symbol" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path class="storageos-cube-top" d="M16 2.5L27.2 8.9L16 15.3L4.8 8.9L16 2.5Z"/>
+                <path class="storageos-cube-left" d="M4 10.5L15.2 16.9V29.5L4 23.1V10.5Z"/>
+                <path class="storageos-cube-blades" d="M6.8 15.5L12.4 18.7" stroke-width="1.2" stroke-linecap="round"/>
+                <path class="storageos-cube-blades" d="M6.8 19.5L12.4 22.7" stroke-width="1.2" stroke-linecap="round"/>
+                <path class="storageos-cube-right" d="M16.8 16.9L28 10.5V23.1L16.8 29.5V16.9Z"/>
+                <path class="storageos-cube-contour" d="M20.5 19.8L24.5 17.5V22.8L20.5 25.1V19.8Z"/>
+              </svg>
+            </div>
+            <span class="topbar-brand-title">StorageOS</span>
+          </a>
+        </div>
+
+        <!-- CENTER: Search bar -->
+        <div class="topbar-center">
+          <form class="search-form" action="{{ url_for('main.search') }}" method="GET" id="header-search-form">
             <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input type="text" name="q" class="search-input" placeholder="{{ t('search_placeholder') }}" value="{{ request.args.get('q', '') }}" id="global-search-input">
+            <input type="text" name="q" class="search-input" placeholder="{{ t('search_placeholder') }}" value="{{ request.args.get('q', '') }}" id="global-search-input" autocomplete="off">
           </form>
         </div>
 
+        <!-- RIGHT: Language, Theme, User/Profile, and Header Controls -->
         <div class="topbar-actions">
           <!-- Language Selector -->
           <div class="dropdown-container">
@@ -173,6 +192,18 @@
               <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
             </svg>
           </button>
+
+          <!-- User Profile Settings Link -->
+          <a href="{{ url_for('main.settings') }}" class="btn-topbar-user" id="topbar-user-btn" title="{{ t('nav_settings') }} ({{ current_user.display_name or current_user.username }})">
+            <div class="user-avatar-sm">
+              {% if current_user.avatar_url %}
+                <img src="{{ current_user.avatar_url }}" alt="{{ current_user.display_name or current_user.username }}" class="avatar-img-sm" />
+              {% else %}
+                <span>{{ (current_user.display_name or current_user.username)[0]|upper }}</span>
+              {% endif %}
+            </div>
+            <span class="topbar-user-name truncate-text">{{ current_user.display_name or current_user.username }}</span>
+          </a>
 
           <!-- Manage Files Quick Action -->
           <a href="{{ url_for('main.files') }}" class="btn btn-primary btn-sm" id="topbar-upload-btn">

@@ -34,6 +34,7 @@ from app.database import (
     list_user_share_links,
     update_user_preferences,
     update_user_password,
+    increment_user_session_version,
 )
 from app.auth import auth_bp, login_required
 from app.security import (
@@ -235,14 +236,44 @@ def files(subpath=""):
     quota = get_user_quota_info(username)
     other_users = list_all_other_usernames(user_id)
 
+    db_user = get_user_by_id(user_id) or {}
+    sort_pref = db_user.get("sort_preference", "name_asc") or "name_asc"
+    file_view = db_user.get("file_view", "list") or "list"
+    confirm_del = db_user.get("confirm_delete", 1)
+    if confirm_del is None:
+        confirm_del = 1
+
+    # Apply user sorting preference
+    folders = data["folders"]
+    files_list = data["files"]
+    if sort_pref == "name_desc":
+        folders.sort(key=lambda f: f["name"].lower(), reverse=True)
+        files_list.sort(key=lambda f: f["name"].lower(), reverse=True)
+    elif sort_pref == "date_desc":
+        folders.sort(key=lambda f: f.get("modified", ""), reverse=True)
+        files_list.sort(key=lambda f: f.get("modified", ""), reverse=True)
+    elif sort_pref == "date_asc":
+        folders.sort(key=lambda f: f.get("modified", ""))
+        files_list.sort(key=lambda f: f.get("modified", ""))
+    elif sort_pref == "size_desc":
+        files_list.sort(key=lambda f: f.get("size_bytes", 0), reverse=True)
+    elif sort_pref == "size_asc":
+        files_list.sort(key=lambda f: f.get("size_bytes", 0))
+    else:  # name_asc (default)
+        folders.sort(key=lambda f: f["name"].lower())
+        files_list.sort(key=lambda f: f["name"].lower())
+
     return render_template(
         "files.html",
         current_path=data["current_path"],
         breadcrumbs=data["breadcrumbs"],
-        folders=data["folders"],
-        files=data["files"],
+        folders=folders,
+        files=files_list,
         quota=quota,
         other_users=other_users,
+        file_view=file_view,
+        sort_preference=sort_pref,
+        confirm_delete=confirm_del,
     )
 
 
@@ -933,38 +964,158 @@ def settings():
     recent_logs = get_user_activity(user_id, limit=5)
     share_links = list_user_share_links(user_id)
 
+    # Health & System Status verification for About StorageOS
+    db_ok = False
+    storage_ok = False
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1;")
+        res = cursor.fetchone()
+        conn.close()
+        db_ok = (res is not None)
+    except Exception:
+        db_ok = False
+
+    try:
+        base_dir = get_base_storage_dir()
+        storage_ok = os.path.exists(base_dir) and os.access(base_dir, os.W_OK)
+    except Exception:
+        storage_ok = False
+
+    system_status = {
+        "version": "1.0.0",
+        "edition": "Enterprise Edition",
+        "status": "Operational" if (db_ok and storage_ok) else "Degraded",
+        "database": "SQLite Enterprise (Connected)" if db_ok else "Database Degraded",
+        "storage": "Isolated User Volumes (Active)" if storage_ok else "Storage Degraded",
+        "security": "Argon2 / PBKDF2 & CSRF Protected",
+        "platform": "StorageOS Cloud Architecture",
+    }
+
     return render_template(
         "settings.html",
         user=db_user,
         quota=quota_info,
         recent_logs=recent_logs,
         share_links=share_links,
+        system_status=system_status,
     )
 
 
+@main_bp.route("/settings/account", methods=["POST"])
+@login_required
+@csrf_protect
+def update_account_settings():
+    """Update user display name and email address."""
+    user_id = session["user_id"]
+    display_name = request.form.get("display_name", "").strip()
+    email = request.form.get("email", "").strip()
+
+    update_user_preferences(user_id, display_name=display_name, email=email)
+    if display_name:
+        session["display_name"] = display_name
+    flash("Account details updated successfully.", "success")
+    return redirect(url_for("main.settings"))
+
+
+@main_bp.route("/settings/appearance", methods=["POST"])
 @main_bp.route("/settings/preferences", methods=["POST"])
 @login_required
 @csrf_protect
 def update_preferences():
-    """Update profile display name, theme, and language."""
+    """Update appearance, localization, and general user preferences."""
     user_id = session["user_id"]
-    display_name = request.form.get("display_name", "").strip()
-    theme = request.form.get("theme", "system").strip().lower()
-    lang = request.form.get("language", "en").strip().lower()
+    display_name = request.form.get("display_name")
+    email = request.form.get("email")
+    theme = request.form.get("theme", "").strip().lower()
+    lang = request.form.get("language", "").strip().lower()
+    file_view = request.form.get("file_view", "").strip().lower()
+    sort_pref = request.form.get("sort_preference", "").strip()
+    confirm_del_raw = request.form.get("confirm_delete")
 
-    if theme not in ("light", "dark", "system"):
+    confirm_del = None
+    if "confirm_delete" in request.form or "has_confirm_delete_field" in request.form:
+        confirm_del = 1 if confirm_del_raw in ("1", "true", "on", "yes") else 0
+
+    if theme and theme not in ("light", "dark", "system"):
         theme = "system"
-    if lang not in SUPPORTED_LANGUAGES:
+    if lang and lang not in SUPPORTED_LANGUAGES:
         lang = "en"
 
-    update_user_preferences(user_id, theme=theme, language=lang, display_name=display_name)
-    session["theme"] = theme
-    session["lang"] = lang
-    if display_name:
-        session["display_name"] = display_name
+    update_user_preferences(
+        user_id,
+        theme=theme if theme else None,
+        language=lang if lang else None,
+        display_name=display_name.strip() if display_name is not None else None,
+        email=email.strip() if email is not None else None,
+        file_view=file_view if file_view in ("list", "grid") else None,
+        sort_preference=sort_pref if sort_pref else None,
+        confirm_delete=confirm_del,
+    )
 
-    flash("Profile and preferences saved successfully.", "success")
+    if theme:
+        session["theme"] = theme
+    if lang:
+        session["lang"] = lang
+    if display_name:
+        session["display_name"] = display_name.strip()
+
+    flash("Preferences updated successfully.", "success")
     return redirect(url_for("main.settings"))
+
+
+@main_bp.route("/settings/file-preferences", methods=["POST"])
+@login_required
+@csrf_protect
+def update_file_preferences():
+    """Update file manager viewing and sorting preferences."""
+    user_id = session["user_id"]
+    file_view = request.form.get("file_view", "list").strip().lower()
+    if file_view not in ("list", "grid"):
+        file_view = "list"
+
+    sort_pref = request.form.get("sort_preference", "name_asc").strip()
+    valid_sorts = ("name_asc", "name_desc", "date_desc", "date_asc", "size_desc", "size_asc")
+    if sort_pref not in valid_sorts:
+        sort_pref = "name_asc"
+
+    confirm_del = 1 if request.form.get("confirm_delete") in ("1", "true", "on", "yes") else 0
+
+    update_user_preferences(
+        user_id,
+        file_view=file_view,
+        sort_preference=sort_pref,
+        confirm_delete=confirm_del,
+    )
+    flash("File preferences updated successfully.", "success")
+    return redirect(url_for("main.settings"))
+
+
+@main_bp.route("/api/preferences/view", methods=["POST"])
+@login_required
+def api_set_view_preference():
+    """AJAX endpoint for toggling list/grid view directly in the file browser."""
+    data = request.get_json(silent=True) or request.form
+    mode = data.get("view", "list").strip().lower()
+    if mode in ("list", "grid"):
+        update_user_preferences(session["user_id"], file_view=mode)
+        return jsonify({"success": True, "file_view": mode})
+    return jsonify({"success": False, "error": "Invalid view mode"}), 400
+
+
+@main_bp.route("/settings/logout-all", methods=["POST"])
+@login_required
+@csrf_protect
+def logout_all_sessions():
+    """Terminate and invalidate all active sessions across all devices."""
+    user_id = session["user_id"]
+    username = session["username"]
+    increment_user_session_version(user_id)
+    log_activity(user_id, "LOGOUT_ALL", None, f"User {username} signed out from all sessions")
+    session.clear()
+    flash("You have been signed out from all active devices and sessions.", "info")
+    return redirect(url_for("auth.login"))
 
 
 @main_bp.route("/settings/password", methods=["POST"])

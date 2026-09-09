@@ -44,6 +44,14 @@ def login_required(f):
             session.clear()
             flash("Session expired or user not found. Please log in again.", "danger")
             return redirect(url_for("auth.login"))
+
+        # Verify session has not been invalidated via logout-all
+        user_session_ver = user.get("session_version", 1) or 1
+        curr_session_ver = session.get("session_version", 1) or 1
+        if curr_session_ver < user_session_ver:
+            session.clear()
+            flash("Your session was signed out from all devices. Please sign in again.", "info")
+            return redirect(url_for("auth.login"))
             
         return f(*args, **kwargs)
     return decorated_function
@@ -98,6 +106,7 @@ def register():
         session.clear()
         session["user_id"] = user_id
         session["username"] = username
+        session["session_version"] = 1
         session["_csrf_token"] = generate_csrf_token()
 
         flash(f"Welcome to StorageOS, {username}! Your personal storage volume has been provisioned.", "success")
@@ -136,6 +145,7 @@ def login():
         session.clear()
         session["user_id"] = user["id"]
         session["username"] = user["username"]
+        session["session_version"] = user.get("session_version", 1) or 1
         session["_csrf_token"] = generate_csrf_token()
 
         # Ensure user storage exists
@@ -278,6 +288,7 @@ def google_callback():
         session["avatar_url"] = user.get("avatar_url")
         session["lang"] = user.get("language") or "en"
         session["theme"] = user.get("theme") or "system"
+        session["session_version"] = user.get("session_version", 1) or 1
         session["_csrf_token"] = generate_csrf_token()
 
         log_activity(user["id"], "LOGIN", None, f"Google OAuth login for {user['username']} ({email})")

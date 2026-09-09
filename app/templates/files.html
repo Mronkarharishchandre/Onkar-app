@@ -42,10 +42,10 @@
     </div>
 
     <div class="files-view-toggles">
-      <button type="button" class="btn-icon btn-sm active" id="btn-view-list" onclick="setFilesViewMode('list')" title="List View">
+      <button type="button" class="btn-icon btn-sm {% if file_view != 'grid' %}active{% endif %}" id="btn-view-list" onclick="setFilesViewMode('list')" title="List View">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
       </button>
-      <button type="button" class="btn-icon btn-sm" id="btn-view-grid" onclick="setFilesViewMode('grid')" title="Grid View">
+      <button type="button" class="btn-icon btn-sm {% if file_view == 'grid' %}active{% endif %}" id="btn-view-grid" onclick="setFilesViewMode('grid')" title="Grid View">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
       </button>
     </div>
@@ -95,7 +95,7 @@
               <span>{{ t('rename') }}</span>
             </button>
             <div class="item-menu-divider"></div>
-            <form action="{{ url_for('main.delete_item') }}" method="POST" onsubmit="return confirm('Move folder and all contents to trash?');">
+            <form action="{{ url_for('main.delete_item') }}" method="POST" onsubmit="return handleDeletionConfirm('Move folder and all contents to trash?');">
               <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
               <input type="hidden" name="relative_path" value="{{ folder.relative_path }}">
               <input type="hidden" name="current_path" value="{{ current_path }}">
@@ -124,7 +124,8 @@
     </div>
 
     {% if files %}
-    <div class="table-container" id="files-list-view">
+    <!-- List View Table -->
+    <div class="table-container" id="files-list-view" style="{% if file_view == 'grid' %}display: none;{% endif %}">
       <table class="data-table">
         <thead>
           <tr>
@@ -206,7 +207,7 @@
 
                     <div class="item-menu-divider"></div>
 
-                    <form action="{{ url_for('main.delete_item') }}" method="POST" onsubmit="return confirm('Move file to trash?');">
+                    <form action="{{ url_for('main.delete_item') }}" method="POST" onsubmit="return handleDeletionConfirm('Move file to trash?');">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                       <input type="hidden" name="relative_path" value="{{ file.relative_path }}">
                       <input type="hidden" name="current_path" value="{{ current_path }}">
@@ -225,6 +226,76 @@
           {% endfor %}
         </tbody>
       </table>
+    </div>
+
+    <!-- Grid View -->
+    <div class="files-grid-container" id="files-grid-view" style="{% if file_view != 'grid' %}display: none;{% endif %}">
+      {% for file in files %}
+      <div class="file-grid-card">
+        <div class="file-grid-preview" onclick="openFilePreview('{{ file.relative_path }}', '{{ file.name }}')">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+          </svg>
+        </div>
+        <div class="file-grid-name truncate-text" onclick="openFilePreview('{{ file.relative_path }}', '{{ file.name }}')" title="{{ file.name }}">
+          {{ file.name }}
+        </div>
+        <div class="file-grid-meta">
+          <span>{{ file.size_formatted }}</span>
+          <span class="badge badge-neutral" style="font-size: 10px;">{{ file.type }}</span>
+        </div>
+        <div class="file-grid-actions">
+          <div style="display: flex; gap: 4px;">
+            <a href="{{ url_for('main.download_file', rel_path=file.relative_path) }}" class="btn-icon btn-sm" title="{{ t('download') }}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>
+              </svg>
+            </a>
+            <button type="button" class="btn-icon btn-sm" title="{{ t('preview') }}" onclick="openFilePreview('{{ file.relative_path }}', '{{ file.name }}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="item-menu-container">
+            <button type="button" class="btn-icon btn-sm" onclick="toggleItemMenu(event, 'file-grid-menu-{{ loop.index }}')" title="More actions">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+              </svg>
+            </button>
+            <div class="item-dropdown-menu" id="file-grid-menu-{{ loop.index }}">
+              <button type="button" class="item-menu-entry" onclick="openFilePreview('{{ file.relative_path }}', '{{ file.name }}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span>{{ t('preview') }}</span>
+              </button>
+              <a href="{{ url_for('main.download_file', rel_path=file.relative_path) }}" class="item-menu-entry">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                <span>{{ t('download') }}</span>
+              </a>
+              <button type="button" class="item-menu-entry" onclick="openModernShareModal('{{ file.relative_path }}', '{{ file.name }}')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
+                <span>{{ t('share') }}</span>
+              </button>
+              <button type="button" class="item-menu-entry" onclick="openRenameModal('{{ file.relative_path }}', '{{ file.name }}', 'file')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                <span>{{ t('rename') }}</span>
+              </button>
+              <div class="item-menu-divider"></div>
+              <form action="{{ url_for('main.delete_item') }}" method="POST" onsubmit="return handleDeletionConfirm('Move file to trash?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="relative_path" value="{{ file.relative_path }}">
+                <input type="hidden" name="current_path" value="{{ current_path }}">
+                <button type="submit" class="item-menu-entry danger">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/></svg>
+                  <span>{{ t('move_to_trash') }}</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
     </div>
     {% else %}
       {% if not folders %}
@@ -344,4 +415,44 @@
     </form>
   </div>
 </div>
+
+<script>
+const CONFIRM_DELETE_SETTING = {{ 'true' if (confirm_delete is not none and confirm_delete != 0) else 'false' }};
+
+function handleDeletionConfirm(message) {
+  if (CONFIRM_DELETE_SETTING) {
+    return confirm(message);
+  }
+  return true;
+}
+
+function setFilesViewMode(mode) {
+  const listView = document.getElementById('files-list-view');
+  const gridView = document.getElementById('files-grid-view');
+  const btnList = document.getElementById('btn-view-list');
+  const btnGrid = document.getElementById('btn-view-grid');
+
+  if (mode === 'grid') {
+    if (listView) listView.style.display = 'none';
+    if (gridView) gridView.style.display = 'grid';
+    if (btnList) btnList.classList.remove('active');
+    if (btnGrid) btnGrid.classList.add('active');
+  } else {
+    if (listView) listView.style.display = 'block';
+    if (gridView) gridView.style.display = 'none';
+    if (btnList) btnList.classList.add('active');
+    if (btnGrid) btnGrid.classList.remove('active');
+  }
+
+  // Persist preference to server asynchronously
+  fetch("{{ url_for('main.api_set_view_preference') }}", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": "{{ csrf_token }}"
+    },
+    body: JSON.stringify({ view: mode })
+  }).catch(function() {});
+}
+</script>
 {% endblock %}
