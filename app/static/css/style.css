@@ -549,7 +549,7 @@ input, select, textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 36px;
   position: sticky;
   top: 0;
   z-index: 30;
@@ -600,21 +600,22 @@ input, select, textarea {
   line-height: 1;
 }
 
-/* Hide topbar brand on wide screens when desktop sidebar is visible */
+/* Hide topbar mobile brand/nav area on wide screens when desktop sidebar is visible */
 @media (min-width: 901px) {
-  .topbar-brand {
+  .topbar-left {
     display: none;
   }
 }
 
 .topbar-center {
-  flex: 1;
+  flex: 0 1 520px;
+  width: 100%;
   max-width: 520px;
   min-width: 0; /* Allows shrinking in flex container without overflowing */
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin: 0 auto;
+  justify-content: flex-start;
+  margin: 0;
 }
 
 .mobile-menu-btn {

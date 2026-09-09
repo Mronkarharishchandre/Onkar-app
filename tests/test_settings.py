@@ -236,3 +236,21 @@ def test_about_section_content(client):
     assert "StorageOS" in html
     assert "1.0.0" in html
     assert "Operational" in html
+
+
+def test_search_bar_layout_and_functionality(client):
+    """Verify the search bar exists in the topbar, preserves original styling, and performs search."""
+    register_and_login(client, username="onkar")
+    res = client.get("/dashboard")
+    assert res.status_code == 200
+    html = res.data.decode("utf-8")
+
+    assert 'id="header-search-form"' in html
+    assert 'id="global-search-input"' in html
+    assert 'class="search-input"' in html
+    assert 'action="/search"' in html
+
+    # Verify search executes properly
+    search_res = client.get("/search?q=test")
+    assert search_res.status_code == 200
+

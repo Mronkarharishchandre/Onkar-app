@@ -7,6 +7,7 @@
   "tests/test_settings.py::test_appearance_settings_update",
   "tests/test_settings.py::test_file_preferences_update",
   "tests/test_settings.py::test_no_unwanted_topbar_user_button",
+  "tests/test_settings.py::test_search_bar_layout_and_functionality",
   "tests/test_settings.py::test_security_password_change_and_logout_all",
   "tests/test_settings.py::test_settings_page_returns_http_200_not_500",
   "tests/test_settings.py::test_storage_section_uses_real_storageos_data",
