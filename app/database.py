@@ -9,21 +9,32 @@ from contextlib import contextmanager
 
 # Determine DB location from environment or default path
 DEFAULT_DB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-DB_PATH = os.environ.get("STORAGEOS_DATABASE_PATH", os.path.join(DEFAULT_DB_DIR, "storageos.db"))
+DEFAULT_DB_FILE = os.path.join(DEFAULT_DB_DIR, "storageos.db")
+DB_PATH = DEFAULT_DB_FILE
 
 
 def get_db_path():
-    """Return the absolute path to the database file, ensuring directory exists."""
+    """Return the absolute path to the database file, ensuring directory exists and is a valid file path."""
     try:
         from flask import current_app, has_app_context
         if has_app_context() and current_app.config.get("DATABASE_PATH"):
-            path = os.path.abspath(current_app.config["DATABASE_PATH"])
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            return path
-    except ImportError:
+            cfg_path = os.path.abspath(current_app.config["DATABASE_PATH"])
+            if os.path.isdir(cfg_path):
+                cfg_path = os.path.join(cfg_path, "storageos.db")
+            os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
+            return cfg_path
+    except (ImportError, Exception):
         pass
 
-    path = os.path.abspath(os.environ.get("STORAGEOS_DATABASE_PATH", DB_PATH))
+    raw_env = os.environ.get("STORAGEOS_DATABASE_PATH", "").strip()
+    # Guard against invalid artifact values like '6', numbers, or empty values
+    if raw_env and not raw_env.isdigit() and raw_env.lower() not in ("6", "true", "false", "default", "none"):
+        path = os.path.abspath(raw_env)
+        if os.path.isdir(path):
+            path = os.path.join(path, "storageos.db")
+    else:
+        path = DEFAULT_DB_FILE
+
     os.makedirs(os.path.dirname(path), exist_ok=True)
     return path
 

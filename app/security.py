@@ -51,8 +51,11 @@ def validate_password(password: str, confirm_password: str = None) -> tuple[bool
 
 
 def hash_password(password: str) -> str:
-    """Hash password using Werkzeug's secure scrypt/pbkdf2 hash."""
-    return generate_password_hash(password, method="scrypt")
+    """Hash password using Werkzeug's secure scrypt or pbkdf2:sha256 hash."""
+    try:
+        return generate_password_hash(password, method="scrypt")
+    except (ValueError, TypeError, Exception):
+        return generate_password_hash(password, method="pbkdf2:sha256")
 
 
 def verify_password(stored_hash: str, password: str) -> bool:

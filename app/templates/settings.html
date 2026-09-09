@@ -254,32 +254,33 @@
           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
             <div style="background-color: var(--bg-secondary); border-radius: var(--radius-md); padding: 14px 12px; text-align: center; border: 1px solid var(--border-color);">
               <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Total Storage</div>
-              <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">{{ quota.quota_formatted }}</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--text-primary);">{{ quota.total_formatted or quota.quota_formatted or '1.0 GB' }}</div>
             </div>
 
             <div style="background-color: var(--bg-secondary); border-radius: var(--radius-md); padding: 14px 12px; text-align: center; border: 1px solid var(--border-color);">
               <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Used Storage</div>
-              <div style="font-size: 18px; font-weight: 700; color: var(--brand-red);">{{ quota.used_formatted }}</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--brand-red);">{{ quota.used_formatted or '0 B' }}</div>
             </div>
 
             <div style="background-color: var(--bg-secondary); border-radius: var(--radius-md); padding: 14px 12px; text-align: center; border: 1px solid var(--border-color);">
               <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Available</div>
-              <div style="font-size: 18px; font-weight: 700; color: var(--success);">{{ quota.available_formatted }}</div>
+              <div style="font-size: 18px; font-weight: 700; color: var(--success);">{{ quota.available_formatted or '1.0 GB' }}</div>
             </div>
           </div>
 
           <!-- Storage Usage Progress Bar -->
+          {% set pct = (quota.percentage if quota.percentage is defined else quota.percent_used)|default(0) %}
           <div class="quota-bar-wrapper">
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 6px;">
               <span style="font-weight: 600; color: var(--text-primary);">Storage Usage</span>
-              <span style="font-weight: 700; color: {% if quota.percent_used >= 90 %}var(--danger){% elif quota.percent_used >= 75 %}var(--warning){% else %}var(--text-primary){% endif %};">{{ quota.percent_used }}% utilized</span>
+              <span style="font-weight: 700; color: {% if pct >= 90 %}var(--danger){% elif pct >= 75 %}var(--warning){% else %}var(--text-primary){% endif %};">{{ pct }}% utilized</span>
             </div>
             <div class="quota-bar" style="height: 12px; border-radius: 6px; background-color: var(--bg-secondary); overflow: hidden; border: 1px solid var(--border-color);">
-              <div class="quota-fill {% if quota.percent_used >= 90 %}danger{% elif quota.percent_used >= 75 %}warning{% endif %}" style="width: {{ quota.percent_used }}%; height: 100%;"></div>
+              <div class="quota-fill {% if pct >= 90 %}danger{% elif pct >= 75 %}warning{% endif %}" style="width: {{ pct }}%; height: 100%;"></div>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px; color: var(--text-secondary);">
-              <span>{{ quota.used_formatted }} used</span>
-              <span>{{ quota.available_formatted }} remaining</span>
+              <span>{{ quota.used_formatted or '0 B' }} used</span>
+              <span>{{ quota.available_formatted or '1.0 GB' }} remaining</span>
             </div>
           </div>
 

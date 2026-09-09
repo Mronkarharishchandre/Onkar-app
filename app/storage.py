@@ -24,8 +24,8 @@ def get_base_storage_dir() -> str:
     except ImportError:
         pass
 
-    env_root = os.environ.get("STORAGEOS_STORAGE_ROOT")
-    if env_root:
+    env_root = os.environ.get("STORAGEOS_STORAGE_ROOT", "").strip()
+    if env_root and not env_root.isdigit() and env_root.lower() not in ("6", "true", "false", "default", "none"):
         os.makedirs(env_root, exist_ok=True)
         return os.path.abspath(env_root)
 
@@ -55,14 +55,17 @@ def get_user_quota_limit() -> int:
     try:
         from flask import current_app, has_app_context
         if has_app_context() and current_app.config.get("STORAGEOS_QUOTA"):
-            return int(current_app.config["STORAGEOS_QUOTA"])
+            val = int(current_app.config["STORAGEOS_QUOTA"])
+            return val * 1024 * 1024 * 1024 if val <= 1024 else val
     except (ImportError, ValueError, TypeError):
         pass
 
     quota_val = os.environ.get("STORAGEOS_QUOTA")
     if quota_val:
         try:
-            return int(quota_val)
+            val = int(quota_val)
+            # If value is small like 1..1024, treat as Gigabytes (e.g. 5 -> 5GB)
+            return val * 1024 * 1024 * 1024 if val <= 1024 else val
         except ValueError:
             pass
     return DEFAULT_QUOTA_BYTES
@@ -140,8 +143,10 @@ def get_user_quota_info(username: str) -> dict:
         "available_bytes": avail_bytes,
         "used_formatted": format_bytes(used_bytes),
         "total_formatted": format_bytes(total_bytes),
+        "quota_formatted": format_bytes(total_bytes),
         "available_formatted": format_bytes(avail_bytes),
         "percentage": percentage,
+        "percent_used": percentage,
         "is_exceeded": used_bytes >= total_bytes,
     }
 
