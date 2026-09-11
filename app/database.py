@@ -3,9 +3,12 @@ StorageOS Database Layer
 SQLite schema definition and parameterized data access layer.
 """
 
+import hashlib
 import os
+import secrets
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 
 # Determine DB location from environment or default path
 DEFAULT_DB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -160,6 +163,21 @@ def init_db():
             """
         )
 
+        # Password Resets table
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                used INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            );
+            """
+        )
+
         # Indexing for high-performance lookup
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_shares_owner ON shares(owner_id);")
@@ -168,6 +186,8 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_logs(user_id, created_at DESC);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_share_links_token ON share_links(token);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_share_links_user ON share_links(user_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_password_resets_hash ON password_resets(token_hash);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);")
 
         # Schema migrations for users table (extend existing schema non-destructively)
         user_cols = [
@@ -491,4 +511,102 @@ def list_user_share_links(user_id: int):
             (user_id,),
         )
         return [dict(row) for row in cursor.fetchall()]
+
+
+# --- Password Reset Functions ---
+def create_password_reset_token(user_id: int, expires_minutes: int = 30) -> str:
+    """
+    Generate a cryptographically secure, single-use, time-limited password reset token.
+    Stores only the SHA-256 hash of the token in the database, never the plaintext token.
+    Invalidates any prior unused reset tokens for this user.
+    """
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    expires_at = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    expires_at_str = expires_at.strftime("%Y-%m-%d %H:%M:%S")
+
+    with db_session() as conn:
+        # Invalidate any existing unused reset tokens for this user
+        conn.execute("UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0;", (user_id,))
+
+        conn.execute(
+            """
+            INSERT INTO password_resets (user_id, token_hash, expires_at, used)
+            VALUES (?, ?, ?, 0);
+            """,
+            (user_id, token_hash, expires_at_str),
+        )
+
+    return raw_token
+
+
+def verify_password_reset_token(raw_token: str) -> dict | None:
+    """
+    Verify that a password reset token is valid, unused, and not expired.
+    Returns the token and user record if valid, or None if invalid/expired.
+    """
+    if not raw_token or not isinstance(raw_token, str):
+        return None
+
+    token_hash = hashlib.sha256(raw_token.strip().encode("utf-8")).hexdigest()
+
+    with db_session() as conn:
+        cursor = conn.execute(
+            """
+            SELECT pr.id, pr.user_id, pr.token_hash, pr.expires_at, pr.used, pr.created_at,
+                   u.username, u.email
+            FROM password_resets pr
+            JOIN users u ON pr.user_id = u.id
+            WHERE pr.token_hash = ? AND pr.used = 0;
+            """,
+            (token_hash,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        record = dict(row)
+        expires_at_val = record.get("expires_at")
+        if expires_at_val:
+            try:
+                if isinstance(expires_at_val, str):
+                    exp_dt = datetime.strptime(expires_at_val[:19], "%Y-%m-%d %H:%M:%S")
+                elif isinstance(expires_at_val, datetime):
+                    exp_dt = expires_at_val
+                else:
+                    return None
+
+                if datetime.utcnow() > exp_dt:
+                    return None  # Expired
+            except Exception:
+                return None
+
+        return record
+
+
+def consume_password_reset_token(raw_token: str, new_password_hash: str) -> bool:
+    """
+    Atomically update user password, invalidate reset token, and invalidate existing sessions.
+    """
+    record = verify_password_reset_token(raw_token)
+    if not record:
+        return False
+
+    user_id = record["user_id"]
+    token_id = record["id"]
+
+    with db_session() as conn:
+        # Mark token as used
+        conn.execute("UPDATE password_resets SET used = 1 WHERE id = ?;", (token_id,))
+
+        # Update password hash
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?;", (new_password_hash, user_id))
+
+        # Invalidate active sessions
+        conn.execute(
+            "UPDATE users SET session_version = COALESCE(session_version, 1) + 1 WHERE id = ?;",
+            (user_id,),
+        )
+
+    return True
 

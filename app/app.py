@@ -19,6 +19,9 @@ from flask import (
     abort,
 )
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.middleware.proxy_fix import ProxyFix
+from flask.sessions import SecureCookieSessionInterface
+from app.security import get_or_create_secret_key
 
 from app.database import (
     init_db,
@@ -73,23 +76,110 @@ from app.i18n import get_translation, SUPPORTED_LANGUAGES, TRANSLATIONS
 main_bp = Blueprint("main", __name__)
 
 
+class DynamicSecureSessionInterface(SecureCookieSessionInterface):
+    """
+    Session interface optimized for both standard web browsing and embedded iframe previews.
+    Ensures cookies work reliably in:
+    1. Cross-origin HTTPS iframes (e.g. AI Studio preview) using SameSite=None; Secure; Partitioned
+    2. Direct HTTPS tab access using Secure cookies
+    3. Local development and test environments over plain HTTP
+    """
+    def _is_secure_context(self, app) -> bool:
+        # Check explicit configuration, ignoring placeholder artifacts like '6'
+        config_val = app.config.get("SESSION_COOKIE_SECURE")
+        if config_val is not None and str(config_val).lower() not in ("auto", "", "6", "none"):
+            return bool(config_val)
+
+        try:
+            # 1. Check Flask request is_secure
+            if getattr(request, "is_secure", False):
+                return True
+            # 2. Check WSGI url scheme
+            if request.environ.get("wsgi.url_scheme") == "https":
+                return True
+            # 3. Check X-Forwarded-Proto header
+            fwd_proto = request.headers.get("X-Forwarded-Proto", "").lower()
+            if "https" in fwd_proto:
+                return True
+            # 4. Check if host indicates Cloud Run preview domain
+            host = request.headers.get("X-Forwarded-Host", "") or request.host or ""
+            if ".run.app" in host.lower():
+                return True
+        except Exception:
+            pass
+        return False
+
+    def get_cookie_secure(self, app):
+        return self._is_secure_context(app)
+
+    def get_cookie_samesite(self, app):
+        # If explicitly set to a valid SameSite value, respect it
+        config_val = app.config.get("SESSION_COOKIE_SAMESITE")
+        if config_val and str(config_val).lower() not in ("auto", "", "6", "default"):
+            return config_val
+
+        # In HTTPS / Cloud Run / preview environments, SameSite MUST be 'None'
+        # so browsers do not drop or block cookies inside preview iframes
+        if self._is_secure_context(app):
+            return "None"
+
+        return "Lax"
+
+    def save_session(self, app, session, response):
+        super().save_session(app, session, response)
+
+        # In secure contexts, ensure the session cookie has Secure, SameSite=None, and CHIPS Partitioned
+        # This enables full compatibility with modern browsers (Chrome 115+) inside embedded iframes
+        if self._is_secure_context(app):
+            set_cookies = response.headers.getlist("Set-Cookie")
+            if set_cookies:
+                cookie_name = self.get_cookie_name(app)
+                new_cookies = []
+                for c in set_cookies:
+                    if c.startswith(cookie_name + "=") or f"; {cookie_name}=" in c:
+                        if "Secure" not in c:
+                            c = c + "; Secure"
+                        if "SameSite" not in c:
+                            c = c + "; SameSite=None"
+                        elif "SameSite=None" in c and "Partitioned" not in c:
+                            c = c + "; Partitioned"
+                    new_cookies.append(c)
+                del response.headers["Set-Cookie"]
+                for nc in new_cookies:
+                    response.headers.add("Set-Cookie", nc)
+
+
 def create_app(test_config=None):
     """Application factory for StorageOS."""
     app = Flask(__name__, template_folder="templates", static_folder="static")
 
-    # Load configuration
-    secret_key = os.environ.get("STORAGEOS_SECRET_KEY")
-    if not secret_key:
-        secret_key = secrets.token_hex(32)
-        print("Warning: STORAGEOS_SECRET_KEY not set. Using temporary ephemeral key.")
-    
+    # Load configuration with stable persistent secret key
+    secret_key = get_or_create_secret_key()
+
+    # Session cookie security configuration
+    session_cookie_secure_env = os.environ.get("SESSION_COOKIE_SECURE", "").strip()
+    if session_cookie_secure_env and session_cookie_secure_env.lower() in ("true", "1", "yes"):
+        cookie_secure_val = True
+    elif session_cookie_secure_env and session_cookie_secure_env.lower() in ("false", "0", "no"):
+        cookie_secure_val = False
+    else:
+        cookie_secure_val = None  # Auto-detect via DynamicSecureSessionInterface
+
+    session_cookie_samesite_env = os.environ.get("SESSION_COOKIE_SAMESITE", "").strip()
+    if session_cookie_samesite_env and session_cookie_samesite_env.lower() in ("none", "lax", "strict"):
+        session_cookie_samesite = session_cookie_samesite_env
+    else:
+        session_cookie_samesite = None  # Auto-detect via DynamicSecureSessionInterface
+
     app.config.from_mapping(
         SECRET_KEY=secret_key,
         MAX_CONTENT_LENGTH=100 * 1024 * 1024,  # 100 MB max upload
+        SESSION_COOKIE_NAME="storageos_session",
         SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE="Lax",
-        SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "False").lower() in ("true", "1"),
+        SESSION_COOKIE_SAMESITE=session_cookie_samesite,
+        SESSION_COOKIE_SECURE=cookie_secure_val,
     )
+    app.session_interface = DynamicSecureSessionInterface()
 
     if test_config:
         app.config.update(test_config)
@@ -179,6 +269,17 @@ def create_app(test_config=None):
     @app.errorhandler(500)
     def internal_server_error(e):
         return render_template("error.html", code=500, title="Internal Server Error", message="An unexpected error occurred. Please try again later."), 500
+
+    # Configure ProxyFix for reverse proxies (Nginx, Node gateway, Cloud Run)
+    # Allows Flask to detect X-Forwarded-Proto (https/http), X-Forwarded-Host, and client IP
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=1,
+        x_proto=1,
+        x_host=1,
+        x_port=1,
+        x_prefix=1,
+    )
 
     return app
 

@@ -4,12 +4,15 @@ Hardened path sanitization, traversal defense, password hashing, and CSRF protec
 """
 
 import hmac
+import logging
 import os
 import re
 import secrets
 from functools import wraps
 from flask import abort, session, request
 from werkzeug.security import generate_password_hash, check_password_hash
+
+logger = logging.getLogger("storageos.security")
 
 # Valid username regex: 3-30 chars, alphanumeric and underscore only
 USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
@@ -141,10 +144,14 @@ def get_safe_user_path(user_storage_root: str, relative_path: str) -> str:
 
 # --- CSRF Protection ---
 def generate_csrf_token() -> str:
-    """Generate and store CSRF token in session."""
-    if "_csrf_token" not in session:
-        session["_csrf_token"] = secrets.token_hex(32)
-    return session["_csrf_token"]
+    """Generate and store CSRF token in session, synchronizing _csrf_token and csrf_token keys."""
+    tok = session.get("_csrf_token") or session.get("csrf_token")
+    if not tok:
+        tok = secrets.token_hex(32)
+        session["_csrf_token"] = tok
+    session["csrf_token"] = tok
+    session["_csrf_token"] = tok
+    return tok
 
 
 def validate_csrf_token(token: str) -> bool:
@@ -157,9 +164,44 @@ def validate_csrf_token(token: str) -> bool:
         pass
 
     session_token = session.get("_csrf_token") or session.get("csrf_token")
-    if not session_token or not token:
+    
+    # Safe non-sensitive diagnostic variables for preview debugging
+    has_cookie = "storageos_session" in request.cookies
+    has_session_token = bool(session_token)
+    has_submitted_token = bool(token)
+    lengths_match = len(str(token).strip()) == len(str(session_token).strip()) if (has_submitted_token and has_session_token) else False
+    pid = os.getpid()
+
+    if not token or not isinstance(token, str):
+        logger.warning(
+            f"[CSRF DIAGNOSTIC] PID={pid} {request.method} {request.path} | "
+            f"cookie_exists={has_cookie} | session_token_exists={has_session_token} | "
+            f"submitted_token_exists={has_submitted_token} | lengths_match={lengths_match} | "
+            f"result=FAILED (no token submitted)"
+        )
         return False
-    return hmac.compare_digest(str(session_token), str(token))
+
+    if not session_token:
+        logger.warning(
+            f"[CSRF DIAGNOSTIC] PID={pid} {request.method} {request.path} | "
+            f"cookie_exists={has_cookie} | session_token_exists={has_session_token} | "
+            f"submitted_token_exists={has_submitted_token} | lengths_match={lengths_match} | "
+            f"result=FAILED (no token in session)"
+        )
+        return False
+
+    try:
+        is_valid = hmac.compare_digest(str(session_token).strip(), str(token).strip())
+        logger.info(
+            f"[CSRF DIAGNOSTIC] PID={pid} {request.method} {request.path} | "
+            f"cookie_exists={has_cookie} | session_token_exists={has_session_token} | "
+            f"submitted_token_exists={has_submitted_token} | lengths_match={lengths_match} | "
+            f"result={'PASSED' if is_valid else 'FAILED (token mismatch)'}"
+        )
+        return is_valid
+    except Exception as e:
+        logger.warning(f"[CSRF DIAGNOSTIC] PID={pid} exception: {type(e).__name__}")
+        return False
 
 
 def csrf_protect(f):
@@ -179,3 +221,50 @@ def csrf_protect(f):
                 abort(403, description="Security token missing or invalid. Please refresh the page.")
         return f(*args, **kwargs)
     return decorated_function
+
+
+def get_or_create_secret_key(data_dir: str = None) -> str:
+    """
+    Return a stable, cryptographic secret key across requests and processes.
+    Resolves in order:
+    1. STORAGEOS_SECRET_KEY or SECRET_KEY environment variables (ignoring invalid artifacts like '6' or short strings)
+    2. Persistent .secret_key file stored in the application data directory
+    3. Generates a fresh 256-bit secure hex key and persists it to disk so all workers share it
+    """
+    # Check environment variables
+    for env_var in ("STORAGEOS_SECRET_KEY", "SECRET_KEY"):
+        val = os.environ.get(env_var, "").strip()
+        # Ensure it is not an invalid artifact like '6', single digits, or too short
+        if val and len(val) >= 16 and val.lower() not in ("6", "true", "false", "default", "none"):
+            return val
+
+    # Resolve data directory
+    if not data_dir:
+        data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    try:
+        os.makedirs(data_dir, exist_ok=True)
+    except Exception:
+        pass
+    secret_file = os.path.join(data_dir, ".secret_key")
+
+    if os.path.isfile(secret_file):
+        try:
+            with open(secret_file, "r") as f:
+                saved = f.read().strip()
+                if saved and len(saved) >= 16:
+                    return saved
+        except Exception:
+            pass
+
+    # Generate and persist new secret
+    new_key = secrets.token_hex(32)
+    try:
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        mode = 0o600
+        fd = os.open(secret_file, flags, mode)
+        with open(fd, "w") as f:
+            f.write(new_key)
+    except Exception:
+        pass
+
+    return new_key

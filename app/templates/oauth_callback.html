@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authentication - StorageOS</title>
+  <style>
+    :root {
+      --bg-primary: #f7f7f8;
+      --card-bg: #ffffff;
+      --text-primary: #1c1d21;
+      --text-secondary: #6e717c;
+      --border-color: #e2e4e9;
+      --brand-red: #e53935;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #0f1013;
+        --card-bg: #18191d;
+        --text-primary: #ededef;
+        --text-secondary: #9094a0;
+        --border-color: #272a31;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+    }
+    .auth-callback-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 32px;
+      max-width: 380px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    .status-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border-color);
+      border-top-color: var(--brand-red);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .status-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 8px;
+    }
+    .status-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin: 0;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-callback-card">
+    <div class="status-spinner"></div>
+    <div class="status-title">
+      {% if success %}Authentication Successful{% else %}Authentication Failed{% endif %}
+    </div>
+    <p class="status-desc">
+      {% if success %}
+        Completing your sign-in to StorageOS. Redirecting...
+      {% else %}
+        {{ error or 'An error occurred during authentication.' }}
+      {% endif %}
+    </p>
+  </div>
+
+  <script>
+    (function() {
+      var isSuccess = {{ 'true' if success else 'false' }};
+      var redirectUrl = "{{ redirect_url or url_for('main.dashboard') }}";
+      var errorMessage = "{{ error or '' }}";
+
+      if (window.opener && window.opener !== window) {
+        try {
+          if (isSuccess) {
+            window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', redirect_url: redirectUrl }, '*');
+            setTimeout(function() { window.close(); }, 300);
+          } else {
+            window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: errorMessage }, '*');
+            setTimeout(function() { window.close(); }, 1200);
+          }
+        } catch (e) {
+          window.location.href = isSuccess ? redirectUrl : "{{ url_for('auth.login') }}";
+        }
+      } else {
+        setTimeout(function() {
+          window.location.href = isSuccess ? redirectUrl : "{{ url_for('auth.login') }}";
+        }, isSuccess ? 200 : 1500);
+      }
+    })();
+  </script>
+</body>
+</html>

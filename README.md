@@ -14,9 +14,11 @@
   - `editor`: Collaborative permission to rename and modify shared files without altering ownership.
 - **Audit Logging & Activity Tracking**: Tamper-evident activity logs recording uploads, renames, deletions, restorations, and shares with timestamps and IP metadata.
 - **Quota & Storage Enforcement**: Real-time quota calculations and pre-upload enforcement (default 5 GB per user, customizable per-user or globally).
-- **Hardened Security**:
+- **Hardened Security & Authentication**:
   - Constant-time comparison CSRF protection on all mutating HTTP requests.
   - PBKDF2-HMAC-SHA256 password hashing with high iteration counts and cryptographic salts.
+  - **Forgot Password / Password Reset**: Secure single-use cryptographic reset tokens with 30-minute expiration, email delivery via SMTP or development-mode console logging, and user enumeration protection.
+  - **Sign in with Google (OAuth 2.0 / OIDC)**: Native Google authentication supporting both popup and redirect flows with CSRF state verification and seamless account linking.
   - Strict filename sanitization removing control characters, NULL bytes, and traversal segments (`../`, `..\`).
   - Automatic Content-Disposition and MIME type sandboxing on downloads.
 - **Full Automation & DevOps Tooling**:
@@ -128,11 +130,44 @@ python3 -m flask --app app.app run --port 5000
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `STORAGEOS_SECRET_KEY` | *(ephemeral)* | Cryptographic secret for signing session cookies and CSRF tokens. |
-| `STORAGEOS_STORAGE_ROOT` | `/data/storage` | Root filesystem directory where user files and trash are stored. |
-| `STORAGEOS_DB_PATH` | `/data/database/storageos.db` | SQLite database file location. |
-| `STORAGEOS_DEFAULT_QUOTA_MB` | `5120` (5 GB) | Default disk space quota allotted to newly registered users in megabytes. |
-| `PORT` | `5000` | HTTP listening port for the Gunicorn WSGI application server. |
+| `STORAGEOS_SECRET_KEY` | *(ephemeral)* | Cryptographic secret for signing session cookies, reset tokens, and CSRF tokens. |
+| `STORAGEOS_STORAGE_ROOT` | `/storage` or `app/data/storage` | Root filesystem directory where user files and trash are stored. |
+| `STORAGEOS_DATABASE_PATH` | `app/data/storageos.db` | SQLite database file location. |
+| `STORAGEOS_QUOTA` | `1073741824` (1 GB) | Default disk space quota allotted to newly registered users in bytes. |
+| `APP_BASE_URL` | *(detected from Host header)* | Public canonical URL for generating password reset links and OAuth callbacks (e.g. `https://your-domain.com`). |
+| `GOOGLE_CLIENT_ID` | *(empty)* | Google Cloud OAuth 2.0 Web Application Client ID. |
+| `GOOGLE_CLIENT_SECRET` | *(empty)* | Google Cloud OAuth 2.0 Client Secret. |
+| `GOOGLE_REDIRECT_URI` | `{APP_BASE_URL}/google/callback` | Authorized redirect URI configured in Google Cloud Console. |
+| `SMTP_HOST` | *(empty)* | SMTP server hostname (e.g. `smtp.gmail.com` or `smtp.sendgrid.net`). If empty, reset links are printed to server console for local testing. |
+| `SMTP_PORT` | `587` | SMTP server port (`587` for STARTTLS, `465` for SSL, `25` for unencrypted). |
+| `SMTP_USER` | *(empty)* | SMTP authentication username. |
+| `SMTP_PASSWORD` | *(empty)* | SMTP authentication password or App Password. |
+| `SMTP_FROM_EMAIL` | *(empty)* | Sender email address shown on password reset emails. |
+| `SMTP_FROM_NAME` | `StorageOS Cloud` | Sender display name. |
+| `SMTP_USE_TLS` | `True` | Enable STARTTLS encryption. |
+| `SMTP_USE_SSL` | `False` | Enable direct SSL/TLS encryption. |
+
+---
+
+## Authentication & OAuth Setup
+
+### 1. Password Reset (Forgot Password)
+- **Production Email Delivery**: Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM_EMAIL`. Reset links will be dispatched directly to the user's verified or registered email address.
+- **Development Mode**: If no SMTP credentials are provided, StorageOS automatically logs the password reset URL to the terminal/server console and displays a development direct-link helper on the confirmation page so you can test password recovery effortlessly without an email server.
+- **Security Protections**: Reset links use single-use cryptographic tokens with a 30-minute expiry window. Attempting to request a reset for an unregistered email returns an identical confirmation message to prevent user enumeration attacks.
+
+### 2. Sign in with Google (OAuth 2.0)
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Navigate to **APIs & Services** > **Credentials**.
+3. Create an **OAuth 2.0 Client ID** with Application type **Web application**.
+4. In **Authorized redirect URIs**, add:
+   ```text
+   https://<your-domain>/google/callback
+   ```
+   (For local development, add `http://localhost:3000/google/callback`).
+5. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your environment or `.env`.
+6. When users click "Sign in with Google", StorageOS completes the handshake, verifies their Google ID token cryptographically, and provisions or links their StorageOS account with isolated storage.
+
 
 ---
 
